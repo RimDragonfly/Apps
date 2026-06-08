@@ -55,9 +55,9 @@ STAT_GENES_CR3 = {
 
 COLOR_LADDER_CR1 = {
     "Red":         (7,  10),
-    "Orange":      (11, 11),
-    "Yellow":      (12, 13),
-    "Green":       (12, 14),
+    "Orange":      (11, 13),
+    "Yellow":      (11, 13),
+    "Green":       (11, 14),
     "Turquoise":   (14, 14),
     "Blue":        (15, 16),
     "Blue-violet": (17, 17),
@@ -66,9 +66,9 @@ COLOR_LADDER_CR1 = {
 
 COLOR_LADDER_CR3 = {
     "Red":         (10, 10),
-    "Orange":      (11, 11),
-    "Yellow":      (12, 13),
-    "Green":       (12, 14),
+    "Orange":      (11, 13),
+    "Yellow":      (11, 13),
+    "Green":       (11, 14),
     "Turquoise":   (14, 14),
     "Blue":        (15, 16),
     "Blue-violet": (15, 17),
@@ -114,10 +114,16 @@ def detect_color(fj, ae, cr):
         return "Unknown"
     if len(matches) == 1:
         return matches[0]
-    if fj in (12, 13, 14):
-        if ae <= 2: return "Turquoise"
-        elif ae <= 4: return "Green"
-        else: return "Yellow"
+    # A-E fine-tunes within the 11-14 zone
+    if fj in (11, 12, 13, 14):
+        if fj == 14 or (fj in (11, 12, 13) and ae <= 2):
+            return "Turquoise" if fj == 14 else "Green"
+        elif ae <= 4:
+            return "Green"
+        elif ae <= 8:
+            return "Yellow"
+        else:
+            return "Orange"
     return " / ".join(matches)
 
 def calculate_changes(positions, cr, target_color):
