@@ -62,6 +62,7 @@ COLOR_LADDER_CR1 = {
     "Turquoise":   (12, 13),
     "Blue":        (14, 16),
     "Blue-violet": (17, 17),
+    "Blue-green":  (17, 19),
     "Purple":      (17, 19),
 }
 
@@ -131,6 +132,10 @@ def detect_color(fj, ae, cr):
             return "Yellow"
         else:
             return "Orange"
+    if fj >= 17:
+        if ae >= 7: return "Blue-green"
+        elif ae >= 4: return "Blue-violet"
+        else: return "Purple"
     return " / ".join(matches)
 
 def calculate_changes(positions, cr, target_color):
