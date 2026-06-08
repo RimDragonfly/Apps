@@ -81,9 +81,9 @@ STAT_GENES_CR3 = {
 # F-J has 20 positions total
 COLOR_LADDER_CR1 = {
     "red":          (7,  10),
-    "orange":       (11, 11),
-    "yellow":       (12, 13),
-    "green":        (12, 14),
+    "orange":       (11, 13),
+    "yellow":       (11, 13),
+    "green":        (11, 14),
     "turquoise":    (14, 14),
     "blue":         (15, 16),
     "blue-violet":  (17, 17),
@@ -93,9 +93,9 @@ COLOR_LADDER_CR1 = {
 
 COLOR_LADDER_CR3 = {
     "red":          (10, 10),
-    "orange":       (11, 11),
-    "yellow":       (12, 13),
-    "green":        (12, 14),
+    "orange":       (11, 13),
+    "yellow":       (11, 13),
+    "green":        (11, 14),
     "turquoise":    (14, 14),
     "blue":         (15, 16),
     "blue-violet":  (15, 17),
@@ -159,21 +159,22 @@ def detect_color(fj_dom, ae_dom, chromosome):
         if lo <= fj_dom <= hi:
             matches.append(color)
     if not matches:
-        # Below the ladder minimum — approaching from counterclockwise (all-recessive) end
         min_fj = min(lo for lo, hi in ladder.values())
         if fj_dom < min_fj:
             return f"below ladder (F-J={fj_dom}) — counterclockwise from red, approaching violet"
         return "unknown"
     if len(matches) == 1:
         return matches[0]
-    # Multiple matches — use A-E to narrow down
-    if fj_dom in (12, 13, 14):
-        if ae_dom <= 2:
-            return "turquoise"
+    # A-E fine-tunes within 11-14 zone
+    if fj_dom in (11, 12, 13, 14):
+        if fj_dom == 14 or (fj_dom in (11, 12, 13) and ae_dom <= 2):
+            return "turquoise" if fj_dom == 14 else "green"
         elif ae_dom <= 4:
             return "green"
-        else:
+        elif ae_dom <= 8:
             return "yellow"
+        else:
+            return "orange"
     return "/".join(matches)
 
 # ============================================================
