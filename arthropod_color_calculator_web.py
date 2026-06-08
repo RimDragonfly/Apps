@@ -115,7 +115,7 @@ def detect_color(fj, ae, cr):
     if fj in (14, 15, 16):
         return "Blue"
     if fj == 10:
-        return "Yellow-green" if ae >= 4 else "Green-yellow"
+        return "Green-yellow" if ae >= 4 else "Yellow-green"
     if fj == 9:
         return "Green" if ae <= 4 else "Orange"
     if fj in (11, 12, 13):

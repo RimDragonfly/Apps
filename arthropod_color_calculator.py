@@ -89,7 +89,7 @@ COLOR_LADDER_CR1 = {
     "turquoise":    (12, 13),
     "blue":         (14, 16),
     "blue-violet":  (17, 17),
-    "blue-green":   (17, 19),
+    "teal":   (17, 19),
     "purple":       (17, 19),
     "violet":       (17, 19),
 }
@@ -102,7 +102,7 @@ COLOR_LADDER_CR3 = {
     "turquoise":    (12, 13),
     "blue":         (14, 16),
     "blue-violet":  (15, 17),
-    "blue-green":   (17, 19),
+    "teal":   (17, 19),
     "purple":       (17, 19),
     "violet":       (17, 19),
 }
