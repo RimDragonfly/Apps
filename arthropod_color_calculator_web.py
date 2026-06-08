@@ -56,8 +56,9 @@ STAT_GENES_CR3 = {
 COLOR_LADDER_CR1 = {
     "Red":         (7,  9),
     "Yellow-green": (10, 10),
+    "Green-yellow":  (10, 10),
     "Orange":      (11, 13),
-    "Yellow":      (11, 13),
+    "Green-yellow":      (11, 13),
     "Green":       (11, 13),
     "Turquoise":   (12, 13),
     "Blue":        (14, 16),
@@ -69,7 +70,7 @@ COLOR_LADDER_CR1 = {
 COLOR_LADDER_CR3 = {
     "Red":         (10, 10),
     "Orange":      (11, 13),
-    "Yellow":      (11, 13),
+    "Green-yellow":      (11, 13),
     "Green":       (9,  13),
     "Turquoise":   (12, 13),
     "Blue":        (14, 16),
@@ -129,7 +130,7 @@ def detect_color(fj, ae, cr):
         elif ae <= 4:
             return "Green"
         elif ae <= 8:
-            return "Yellow"
+            return "Green-yellow"
         else:
             return "Orange"
     if fj >= 17:

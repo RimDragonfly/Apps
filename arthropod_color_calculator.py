@@ -82,8 +82,9 @@ STAT_GENES_CR3 = {
 COLOR_LADDER_CR1 = {
     "red":          (7,  9),
     "yellow-green": (10, 10),
+    "green-yellow":  (10, 10),
     "orange":       (11, 13),
-    "yellow":       (11, 13),
+    "green-yellow":       (11, 13),
     "green":        (11, 13),
     "turquoise":    (12, 13),
     "blue":         (14, 16),
@@ -96,7 +97,7 @@ COLOR_LADDER_CR1 = {
 COLOR_LADDER_CR3 = {
     "red":          (10, 10),
     "orange":       (11, 13),
-    "yellow":       (11, 13),
+    "green-yellow":       (11, 13),
     "green":        (9,  13),
     "turquoise":    (12, 13),
     "blue":         (14, 16),
@@ -178,7 +179,7 @@ def detect_color(fj_dom, ae_dom, chromosome):
         elif ae_dom <= 4:
             return "green"
         elif ae_dom <= 8:
-            return "yellow"
+            return "green-yellow"
         else:
             return "orange"
     return "/".join(matches)
