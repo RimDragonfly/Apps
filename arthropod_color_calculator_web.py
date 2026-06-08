@@ -58,7 +58,7 @@ COLOR_LADDER_CR1 = {
     "Yellow-green": (10, 10),
     "Green-yellow":  (10, 10),
     "Orange":      (11, 13),
-    "Green-yellow":      (11, 13),
+    "Orange":        (11, 13),
     "Green":       (11, 13),
     "Turquoise":   (12, 13),
     "Blue":        (14, 16),
@@ -70,7 +70,7 @@ COLOR_LADDER_CR1 = {
 COLOR_LADDER_CR3 = {
     "Red":         (10, 10),
     "Orange":      (11, 13),
-    "Green-yellow":      (11, 13),
+    "Orange":        (11, 13),
     "Green":       (9,  13),
     "Turquoise":   (12, 13),
     "Blue":        (14, 16),
@@ -108,36 +108,32 @@ def ae_dom_count(positions, cr):
                if is_dom(positions.get(f"{cr}{label}{pos}", "o")))
 
 def detect_color(fj, ae, cr):
-    ladder = COLOR_LADDER_CR1 if cr == 1 else COLOR_LADDER_CR3
-    matches = [c for c, (lo, hi) in ladder.items() if lo <= fj <= hi]
-    if not matches:
-        min_fj = min(lo for lo, hi in ladder.values())
-        if fj < min_fj:
-            return "Below ladder — possible counterclockwise approach to violet/purple"
-        return "Unknown"
-    if len(matches) == 1:
-        return matches[0]
-    # F-J=14: blue (A-E fine-tunes within blue range)
-    if fj == 14:
+    if fj >= 17:
+        if ae >= 7: return "Blue-green"
+        elif ae >= 4: return "Blue-violet"
+        else: return "Purple"
+    if fj in (14, 15, 16):
         return "Blue"
-    # F-J=9 (CR3 only): green when A-E low
+    if fj == 10:
+        return "Yellow-green" if ae >= 4 else "Green-yellow"
     if fj == 9:
-        return "Green" if ae <= 4 else "Orange / Green"
-    # F-J=11-13: A-E determines color
+        return "Green" if ae <= 4 else "Orange"
     if fj in (11, 12, 13):
         if ae <= 2:
             return "Turquoise" if fj in (12, 13) else "Green"
         elif ae <= 4:
             return "Green"
         elif ae <= 8:
-            return "Green-yellow"
+            return "Yellow"
         else:
             return "Orange"
-    if fj >= 17:
-        if ae >= 7: return "Blue-green"
-        elif ae >= 4: return "Blue-violet"
-        else: return "Purple"
-    return " / ".join(matches)
+    if fj <= 9:
+        return "Red"
+    ladder = COLOR_LADDER_CR1 if cr == 1 else COLOR_LADDER_CR3
+    min_fj = min(lo for lo, hi in ladder.values())
+    if fj < min_fj:
+        return "Below ladder — possible counterclockwise approach to violet/purple"
+    return "Unknown"
 
 def calculate_changes(positions, cr, target_color):
     locked = LOCKED_DOMINANT_CR1 if cr == 1 else LOCKED_DOMINANT_CR3
