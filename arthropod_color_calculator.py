@@ -80,7 +80,8 @@ STAT_GENES_CR3 = {
 # Color ladder: color name -> (min F-J dom/mixed, max F-J dom/mixed)
 # F-J has 20 positions total
 COLOR_LADDER_CR1 = {
-    "red":          (7,  10),
+    "red":          (7,  9),
+    "yellow-green": (10, 10),
     "orange":       (11, 13),
     "yellow":       (11, 13),
     "green":        (11, 13),

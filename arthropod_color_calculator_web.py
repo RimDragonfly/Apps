@@ -54,12 +54,13 @@ STAT_GENES_CR3 = {
 }
 
 COLOR_LADDER_CR1 = {
-    "Red":         (7,  10),
+    "Red":         (7,  9),
+    "Yellow-green": (10, 10),
     "Orange":      (11, 13),
     "Yellow":      (11, 13),
-    "Green":       (11, 14),
-    "Turquoise":   (14, 14),
-    "Blue":        (15, 16),
+    "Green":       (11, 13),
+    "Turquoise":   (12, 13),
+    "Blue":        (14, 16),
     "Blue-violet": (17, 17),
     "Purple":      (17, 19),
 }
@@ -68,9 +69,9 @@ COLOR_LADDER_CR3 = {
     "Red":         (10, 10),
     "Orange":      (11, 13),
     "Yellow":      (11, 13),
-    "Green":       (11, 14),
-    "Turquoise":   (14, 14),
-    "Blue":        (15, 16),
+    "Green":       (9,  13),
+    "Turquoise":   (12, 13),
+    "Blue":        (14, 16),
     "Blue-violet": (15, 17),
     "Purple":      (17, 19),
 }
@@ -114,10 +115,16 @@ def detect_color(fj, ae, cr):
         return "Unknown"
     if len(matches) == 1:
         return matches[0]
-    # A-E fine-tunes within the 11-14 zone
-    if fj in (11, 12, 13, 14):
-        if fj == 14 or (fj in (11, 12, 13) and ae <= 2):
-            return "Turquoise" if fj == 14 else "Green"
+    # F-J=14: blue (A-E fine-tunes within blue range)
+    if fj == 14:
+        return "Blue"
+    # F-J=9 (CR3 only): green when A-E low
+    if fj == 9:
+        return "Green" if ae <= 4 else "Orange / Green"
+    # F-J=11-13: A-E determines color
+    if fj in (11, 12, 13):
+        if ae <= 2:
+            return "Turquoise" if fj in (12, 13) else "Green"
         elif ae <= 4:
             return "Green"
         elif ae <= 8:
