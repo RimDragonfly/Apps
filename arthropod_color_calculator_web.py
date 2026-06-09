@@ -318,16 +318,23 @@ if genome_input.strip():
                     st.warning(f"⚠️ {label}: Only {len(selected)} eligible positions found — not enough.")
                     return
 
+                # Calculate net stat change for summary
+                net = sum(cost.values())
                 if pts == 0:
                     st.success(f"**{label}:** {needed} change(s) — 🟢 no stat cost")
+                elif net > 0:
+                    st.success(f"**{label}:** {needed} change(s) — 🟢 {pts} stat point(s) gained")
                 else:
                     st.warning(f"**{label}:** {needed} change(s) — 🔴 {pts} stat point(s) lost")
 
                 st.markdown(f"*Direction: {direction}*")
                 for i, (coord, is_stat, stat_name, stat_val) in enumerate(selected):
                     if is_stat and stat_val > 0:
-                        sign = "−" if direction == "dominant → recessive" else "+"
-                        st.markdown(f"**{i+1}.** `{coord}` · costs **{sign}{stat_val} {stat_name}**")
+                        # dominant→recessive = stat ON = gain; recessive→dominant = stat OFF = loss
+                        if direction == "dominant → recessive":
+                            st.markdown(f"**{i+1}.** `{coord}` · gains **+{stat_val} {stat_name}**")
+                        else:
+                            st.markdown(f"**{i+1}.** `{coord}` · costs **−{stat_val} {stat_name}**")
                     else:
                         st.markdown(f"**{i+1}.** `{coord}` · cosmetic, no stat cost")
 
