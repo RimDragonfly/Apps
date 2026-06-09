@@ -220,7 +220,7 @@ def calculate_changes(positions, cr, target_color):
         cost_b = calc_cost(selected_b, dir_b)
         pts_b = sum(abs(v) for v in cost_b.values())
         results["path_b"] = {
-            "label": "Clockwise wrap (experimental — red at top of wheel, both body and wings)",
+            "label": "Clockwise wrap",
             "direction": dir_b,
             "needed": needed_b,
             "selected": selected_b,
