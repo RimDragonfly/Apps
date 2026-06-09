@@ -63,7 +63,7 @@ COLOR_LADDER_CR1 = {
     "Turquoise":   (12, 13),
     "Blue":        (14, 16),
     "Blue-violet": (17, 17),
-    "Blue-green":  (17, 19),
+    "Teal":  (17, 19),
     "Purple":      (17, 19),
 }
 
@@ -109,7 +109,7 @@ def ae_dom_count(positions, cr):
 
 def detect_color(fj, ae, cr):
     if fj >= 17:
-        if ae >= 7: return "Blue-green"
+        if ae >= 7: return "Teal"
         elif ae >= 4: return "Blue-violet"
         else: return "Purple"
     if fj in (14, 15, 16):
@@ -117,7 +117,12 @@ def detect_color(fj, ae, cr):
     if fj == 10:
         return "Green-yellow" if ae >= 4 else "Yellow-green"
     if fj == 9:
-        return "Green" if ae <= 4 else "Orange"
+        if cr == 3:
+            return "Green" if ae <= 4 else "Orange"
+        else:  # CR1
+            if ae <= 4: return "Green"
+            elif ae <= 8: return "Yellow"
+            else: return "Orange"
     if fj in (11, 12, 13):
         if ae <= 2:
             return "Turquoise" if fj in (12, 13) else "Green"
@@ -127,7 +132,7 @@ def detect_color(fj, ae, cr):
             return "Yellow"
         else:
             return "Orange"
-    if fj <= 9:
+    if fj <= 8:
         return "Red"
     ladder = COLOR_LADDER_CR1 if cr == 1 else COLOR_LADDER_CR3
     min_fj = min(lo for lo, hi in ladder.values())
@@ -135,54 +140,87 @@ def detect_color(fj, ae, cr):
         return "Below ladder — possible counterclockwise approach to violet/purple"
     return "Unknown"
 
-def calculate_changes(positions, cr, target_color):
+def get_candidates(positions, cr, direction):
+    """Get eligible F-J positions for flipping in a given direction."""
     locked = LOCKED_DOMINANT_CR1 if cr == 1 else LOCKED_DOMINANT_CR3
     stat_genes = STAT_GENES_CR1 if cr == 1 else STAT_GENES_CR3
-    ladder = COLOR_LADDER_CR1 if cr == 1 else COLOR_LADDER_CR3
+    candidates = []
+    for label in "FGHIJ":
+        for pos in range(1, 5):
+            coord = f"{cr}{label}{pos}"
+            if coord not in positions: continue
+            if coord in locked: continue
+            state = positions[coord]
+            if direction == "recessive → dominant" and is_dom(state): continue
+            if direction == "dominant → recessive" and not is_dom(state): continue
+            is_stat = coord in stat_genes
+            stat_name = stat_genes[coord][0] if is_stat else None
+            stat_val = stat_genes[coord][1] if is_stat else 0
+            candidates.append((coord, is_stat, stat_name, stat_val))
+    candidates.sort(key=lambda x: (x[1], x[3]))
+    return candidates
 
+def calc_cost(selected, direction):
+    """Calculate total stat cost for a set of changes."""
+    cost = {}
+    for coord, is_stat, stat_name, stat_val in selected:
+        if is_stat and stat_val > 0:
+            delta = -stat_val if direction == "dominant → recessive" else stat_val
+            cost[stat_name] = cost.get(stat_name, 0) + delta
+    return cost
+
+def calculate_changes(positions, cr, target_color):
+    ladder = COLOR_LADDER_CR1 if cr == 1 else COLOR_LADDER_CR3
     target_lo, target_hi = ladder[target_color]
     current_fj = fj_dom_count(positions, cr)
 
     if target_lo <= current_fj <= target_hi:
-        return current_fj, 0, "already_there", [], {}
+        return "already_there", None, None
 
-    changes = []
-    total_stat_cost = {}
+    results = {}
 
+    # --- Path A: direct (counterclockwise if going down, clockwise if going up) ---
     if current_fj < target_lo:
-        needed = target_lo - current_fj
-        direction = "recessive → dominant"
-        candidates = []
-        for label in "FGHIJ":
-            for pos in range(1, 5):
-                coord = f"{cr}{label}{pos}"
-                if coord in positions and not is_dom(positions[coord]) and coord not in locked:
-                    is_stat = coord in stat_genes
-                    stat_name = stat_genes[coord][0] if is_stat else None
-                    stat_val = stat_genes[coord][1] if is_stat else 0
-                    candidates.append((coord, is_stat, stat_name, stat_val))
+        dir_a = "recessive → dominant"
+        needed_a = target_lo - current_fj
     else:
-        needed = current_fj - target_hi
-        direction = "dominant → recessive"
-        candidates = []
-        for label in "FGHIJ":
-            for pos in range(1, 5):
-                coord = f"{cr}{label}{pos}"
-                if coord in positions and is_dom(positions[coord]) and coord not in locked:
-                    is_stat = coord in stat_genes
-                    stat_name = stat_genes[coord][0] if is_stat else None
-                    stat_val = stat_genes[coord][1] if is_stat else 0
-                    candidates.append((coord, is_stat, stat_name, stat_val))
+        dir_a = "dominant → recessive"
+        needed_a = current_fj - target_hi
 
-    candidates.sort(key=lambda x: (x[1], x[3]))
-    selected = candidates[:needed]
+    cands_a = get_candidates(positions, cr, dir_a)
+    selected_a = cands_a[:needed_a]
+    cost_a = calc_cost(selected_a, dir_a)
+    pts_a = sum(abs(v) for v in cost_a.values())
+    results["path_a"] = {
+        "label": "Direct path",
+        "direction": dir_a,
+        "needed": needed_a,
+        "selected": selected_a,
+        "cost": cost_a,
+        "pts": pts_a,
+        "feasible": len(selected_a) >= needed_a,
+    }
 
-    for coord, is_stat, stat_name, stat_val in selected:
-        if is_stat and stat_val > 0:
-            delta = -stat_val if direction == "dominant → recessive" else stat_val
-            total_stat_cost[stat_name] = total_stat_cost.get(stat_name, 0) + delta
+    # --- Path B: clockwise wrap to red (only when target is Red and current_fj is high) ---
+    if target_color == "Red" and current_fj > target_hi:
+        dir_b = "recessive → dominant"
+        # Flip all remaining recessive F-J positions to dominant — wraps around to red
+        cands_b = get_candidates(positions, cr, dir_b)
+        needed_b = len(cands_b)  # flip everything recessive in F-J
+        selected_b = cands_b
+        cost_b = calc_cost(selected_b, dir_b)
+        pts_b = sum(abs(v) for v in cost_b.values())
+        results["path_b"] = {
+            "label": "Clockwise wrap (experimental — red at top of wheel)",
+            "direction": dir_b,
+            "needed": needed_b,
+            "selected": selected_b,
+            "cost": cost_b,
+            "pts": pts_b,
+            "feasible": True,
+        }
 
-    return current_fj, needed, direction, selected, total_stat_cost
+    return "paths", results, target_color
 
 # ============================================================
 # STREAMLIT UI
@@ -248,42 +286,70 @@ if genome_input.strip():
         st.divider()
 
         target_lo, target_hi = ladder[target_color]
-        current_fj_val, needed, direction, selected, stat_cost = calculate_changes(
-            positions, cr, target_color
-        )
+        status, paths, _ = calculate_changes(positions, cr, target_color)
 
-        if direction == "already_there":
+        if status == "already_there":
             st.success(f"✅ Already in the **{target_color}** zone (F-J dom/mixed = {fj}).")
             st.info("A-E dominant or mixed fine-tunes the exact shade within this zone.")
         else:
-            if needed > len(selected):
-                st.warning(f"⚠️ Only {len(selected)} eligible positions found — not enough to fully reach {target_color}.")
-            else:
-                st.success(f"**{needed} change(s)** needed to reach {target_color}.")
+            def show_path(path, label):
+                direction = path["direction"]
+                needed = path["needed"]
+                selected = path["selected"]
+                cost = path["cost"]
+                pts = path["pts"]
+                feasible = path["feasible"]
 
-            st.markdown(f"**Direction:** {direction}")
-            st.markdown(f"**Target F-J dominant or mixed:** {target_lo}–{target_hi}")
+                if not feasible:
+                    st.warning(f"⚠️ {label}: Only {len(selected)} eligible positions found — not enough.")
+                    return
 
-            st.markdown("#### Recommended changes")
-            st.caption("Sorted by fewest stat points affected — cosmetic changes listed first.")
-
-            for i, (coord, is_stat, stat_name, stat_val) in enumerate(selected):
-                if is_stat and stat_val > 0:
-                    sign = "−" if direction == "dominant → recessive" else "+"
-                    note = f"{sign}{stat_val} {stat_name}"
-                    st.markdown(f"**{i+1}.** `{coord}` — {direction} · costs **{note}**")
+                if pts == 0:
+                    st.success(f"**{label}:** {needed} change(s) — 🟢 no stat cost")
                 else:
-                    st.markdown(f"**{i+1}.** `{coord}` — {direction} · cosmetic, no stat cost")
+                    st.warning(f"**{label}:** {needed} change(s) — 🔴 {pts} stat point(s) lost")
 
-            if stat_cost:
-                st.markdown("#### Total stat impact")
-                for stat, delta in sorted(stat_cost.items()):
-                    sign = "+" if delta > 0 else ""
-                    color_str = "🟢" if delta > 0 else "🔴"
-                    st.markdown(f"{color_str} **{stat}:** {sign}{delta}")
+                st.markdown(f"*Direction: {direction}*")
+                for i, (coord, is_stat, stat_name, stat_val) in enumerate(selected):
+                    if is_stat and stat_val > 0:
+                        sign = "−" if direction == "dominant → recessive" else "+"
+                        st.markdown(f"**{i+1}.** `{coord}` · costs **{sign}{stat_val} {stat_name}**")
+                    else:
+                        st.markdown(f"**{i+1}.** `{coord}` · cosmetic, no stat cost")
+
+                if cost:
+                    for stat, delta in sorted(cost.items()):
+                        sign = "+" if delta > 0 else ""
+                        color_str = "🟢" if delta > 0 else "🔴"
+                        st.markdown(f"{color_str} **{stat}:** {sign}{delta}")
+                else:
+                    st.markdown("🟢 **No stat impact.**")
+
+            path_a = paths.get("path_a")
+            path_b = paths.get("path_b")
+
+            if path_b:
+                # Show both paths, recommend cheaper one
+                pts_a = path_a["pts"] if path_a else 999
+                pts_b = path_b["pts"]
+
+                if pts_a <= pts_b:
+                    st.markdown("### ✅ Recommended: Direct path")
+                    show_path(path_a, path_a["label"])
+                    st.divider()
+                    st.markdown(f"### Alternative: {path_b['label']}")
+                    st.caption(f"Costs {pts_b} stat points — more expensive than direct path.")
+                    show_path(path_b, path_b["label"])
+                else:
+                    st.markdown(f"### ✅ Recommended: {path_b['label']}")
+                    st.caption("Cheaper in stat cost than the direct path.")
+                    show_path(path_b, path_b["label"])
+                    st.divider()
+                    st.markdown("### Alternative: Direct path")
+                    st.caption(f"Costs {pts_a} stat points — more expensive.")
+                    show_path(path_a, path_a["label"])
             else:
-                st.markdown("#### Total stat impact")
-                st.markdown("🟢 **None** — all changes are cosmetic.")
+                show_path(path_a, path_a["label"])
 
 st.divider()
 st.markdown("""

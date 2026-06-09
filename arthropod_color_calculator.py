@@ -172,7 +172,12 @@ def detect_color(fj_dom, ae_dom, chromosome):
     if fj_dom == 14:
         return "blue"
     if fj_dom == 9:
-        return "green" if ae_dom <= 4 else "orange/green"
+        if chromosome == 3:
+            return "green" if ae_dom <= 4 else "orange"
+        else:
+            if ae_dom <= 4: return "green"
+            elif ae_dom <= 8: return "yellow"
+            else: return "orange"
     if fj_dom in (11, 12, 13):
         if ae_dom <= 2:
             return "turquoise" if fj_dom in (12, 13) else "green"
