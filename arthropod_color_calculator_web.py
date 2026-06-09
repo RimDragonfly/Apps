@@ -91,7 +91,7 @@ def parse_genome(raw, chromosome):
     unknown = sum(1 for c in cleaned if c == "?")
     if unknown > 0:
         return None, (f"Genome contains {unknown} unknown position(s) marked as '?'. "
-                      f"This tool requires Genetics skill uncapped at level 1000 so all "
+                      f"This tool requires Genetics skill uncapped at level 100 so all "
                       f"positions are visible. Unknown genes cannot be read correctly.")
     positions = {}
     for i, label in enumerate(LABELS):
@@ -251,7 +251,7 @@ Paste your genome export directly from the game.
 **Notation:** `o` or `R` = recessive · everything else = dominant or mixed
 """)
 
-st.warning("""⚠️ **Genetics skill must be uncapped at level 1000.**
+st.warning("""⚠️ **Genetics skill must be uncapped at level 100.**
 If your Genetics skill is not at maximum, some gene positions will show as **?** (unknown).
 Unknown positions cannot be read correctly and will cause wrong results.
 Do not use this tool with a genome that contains ? marks.""")

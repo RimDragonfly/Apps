@@ -309,7 +309,7 @@ def main():
     print("=" * 55)
     print()
     print("!! IMPORTANT !!")
-    print("Genetics skill must be uncapped at level 1000.")
+    print("Genetics skill must be uncapped at level 100.")
     print("Genomes containing ? (unknown positions) will be")
     print("rejected. All positions must be fully visible.")
     print()
