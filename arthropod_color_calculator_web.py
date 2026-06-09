@@ -88,6 +88,11 @@ def parse_genome(raw, chromosome):
     cleaned = raw.replace(" ", "")
     if len(cleaned) != 40:
         return None, f"Expected 40 positions, got {len(cleaned)}. Check input."
+    unknown = sum(1 for c in cleaned if c == "?")
+    if unknown > 0:
+        return None, (f"Genome contains {unknown} unknown position(s) marked as '?'. "
+                      f"This tool requires Genetics skill uncapped at level 1000 so all "
+                      f"positions are visible. Unknown genes cannot be read correctly.")
     positions = {}
     for i, label in enumerate(LABELS):
         for pos in range(4):
@@ -161,11 +166,15 @@ def get_candidates(positions, cr, direction):
     return candidates
 
 def calc_cost(selected, direction):
-    """Calculate total stat cost for a set of changes."""
+    """Calculate total stat cost for a set of changes.
+    For arthropods: stats express at recessive (o).
+    recessive → dominant = stat turns OFF = loss (negative)
+    dominant → recessive = stat turns ON = gain (positive)
+    """
     cost = {}
     for coord, is_stat, stat_name, stat_val in selected:
         if is_stat and stat_val > 0:
-            delta = -stat_val if direction == "dominant → recessive" else stat_val
+            delta = stat_val if direction == "dominant → recessive" else -stat_val
             cost[stat_name] = cost.get(stat_name, 0) + delta
     return cost
 
@@ -211,7 +220,7 @@ def calculate_changes(positions, cr, target_color):
         cost_b = calc_cost(selected_b, dir_b)
         pts_b = sum(abs(v) for v in cost_b.values())
         results["path_b"] = {
-            "label": "Clockwise wrap (experimental — red at top of wheel)",
+            "label": "Clockwise wrap (experimental — red at top of wheel, both body and wings)",
             "direction": dir_b,
             "needed": needed_b,
             "selected": selected_b,
@@ -241,6 +250,11 @@ Paste your genome export directly from the game.
 
 **Notation:** `o` or `R` = recessive · everything else = dominant or mixed
 """)
+
+st.warning("""⚠️ **Genetics skill must be uncapped at level 1000.**
+If your Genetics skill is not at maximum, some gene positions will show as **?** (unknown).
+Unknown positions cannot be read correctly and will cause wrong results.
+Do not use this tool with a genome that contains ? marks.""")
 
 st.divider()
 
