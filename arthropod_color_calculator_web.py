@@ -251,10 +251,7 @@ Paste your genome export directly from the game.
 **Notation:** `o` or `R` = recessive · everything else = dominant or mixed
 """)
 
-st.warning("""⚠️ **Genetics skill must be uncapped at level 100.**
-If your Genetics skill is not at maximum, some gene positions will show as **?** (unknown).
-Unknown positions cannot be read correctly and will cause wrong results.
-Do not use this tool with a genome that contains ? marks.""")
+st.warning("⚠️ **Genetics skill must be uncapped at level 100.** Do not use this tool with a genome that contains ? marks.")
 
 st.divider()
 
@@ -296,6 +293,20 @@ if genome_input.strip():
         m1.metric("F-J dominant or mixed", f"{fj} / 20")
         m2.metric("A-E dominant or mixed", f"{ae} / 20")
         m3.metric("Estimated color", current_color)
+
+        # Show low F-J note when genome is below ladder or targeting red with very low F-J
+        if "Below ladder" in current_color or (target_color == "Red" and fj <= 6):
+            st.info("""ℹ️ **Low F-J zone — bottom of the wheel**
+
+The color wheel is circular. Red appears at both ends of the ladder.
+All-recessive on CR 1 is confirmed to produce red by wrapping clockwise past violet.
+
+What other colors may exist in this low F-J zone (F-J=0–6) is **untested**.
+Other colors may be achievable here. Until data points confirm what lives in this zone,
+this app defaults to Red for any genome below F-J=7.
+
+If your bee has an unusual color at very low F-J, that is valuable research data.
+Please share it with Kaskrim.""")
 
         st.divider()
 
@@ -380,3 +391,4 @@ F-J dominant or mixed sets broad hue position. A-E dominant or mixed fine-tunes 
 More dominant or mixed = clockwise on the color wheel. Less = counterclockwise.
 </small>
 """, unsafe_allow_html=True)
+
