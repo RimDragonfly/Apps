@@ -60,7 +60,7 @@ COLOR_LADDER_CR1 = {
     "Orange":      (11, 13),
     "Orange":        (11, 13),
     "Green":       (11, 13),
-    "Turquoise":   (12, 13),
+    
     "Blue":        (14, 16),
     "Blue-violet": (17, 17),
     "Teal":  (17, 19),
@@ -72,7 +72,7 @@ COLOR_LADDER_CR3 = {
     "Orange":      (11, 13),
     "Orange":        (11, 13),
     "Green":       (9,  13),
-    "Turquoise":   (12, 13),
+    
     "Blue":        (14, 16),
     "Blue-violet": (15, 17),
     "Purple":      (17, 19),
@@ -118,7 +118,7 @@ def detect_color(fj, ae, cr):
         elif ae >= 4: return "Blue-violet"
         else: return "Purple"
     if fj in (14, 15, 16):
-        return "Blue"
+        return "Teal" if ae >= 5 else "Blue"
     if fj == 10:
         return "Green-yellow" if ae >= 4 else "Yellow-green"
     if fj == 9:
@@ -130,7 +130,7 @@ def detect_color(fj, ae, cr):
             else: return "Orange"
     if fj in (11, 12, 13):
         if ae <= 2:
-            return "Turquoise" if fj in (12, 13) else "Green"
+            return "Teal" if fj in (12, 13) else "Green"
         elif ae <= 4:
             return "Green"
         elif ae <= 8:

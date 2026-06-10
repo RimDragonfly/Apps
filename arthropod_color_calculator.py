@@ -86,7 +86,7 @@ COLOR_LADDER_CR1 = {
     "orange":       (11, 13),
     "green-yellow":       (11, 13),
     "green":        (11, 13),
-    "turquoise":    (12, 13),
+    
     "blue":         (14, 16),
     "blue-violet":  (17, 17),
     "teal":   (17, 19),
@@ -99,7 +99,7 @@ COLOR_LADDER_CR3 = {
     "orange":       (11, 13),
     "green-yellow":       (11, 13),
     "green":        (9,  13),
-    "turquoise":    (12, 13),
+    
     "blue":         (14, 16),
     "blue-violet":  (15, 17),
     "teal":   (17, 19),
@@ -180,7 +180,7 @@ def detect_color(fj_dom, ae_dom, chromosome):
             else: return "orange"
     if fj_dom in (11, 12, 13):
         if ae_dom <= 2:
-            return "turquoise" if fj_dom in (12, 13) else "green"
+            return "teal" if fj_dom in (12, 13) else "green"
         elif ae_dom <= 4:
             return "green"
         elif ae_dom <= 8:
