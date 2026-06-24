@@ -286,6 +286,41 @@ def parse_full_export(text):
             result[cr] = gene_lines[cr]
     return result
 
+def show_glow_path(path, label):
+    """Display a CR5 glow flip path with stat notes in Streamlit."""
+    flips = path["flips"]
+    net = path["net_stat"]
+    net_total = path["net_total"]
+    if not flips:
+        st.success(f"**{label}:** Already matches a glow-on pattern — no flips needed.")
+        return
+    if net_total > 0:
+        summary = f"{path['flips_count']} flip(s) — 🟢 net +{net_total} stat points"
+    elif net_total < 0:
+        summary = f"{path['flips_count']} flip(s) — 🔴 net {net_total} stat points"
+    else:
+        summary = f"{path['flips_count']} flip(s) — no net stat change"
+    st.markdown(f"**{label}:** {summary}")
+    st.caption(f"Target pattern: `{path['target']}`")
+    for f in flips:
+        coord = f["coord"]
+        direction = f["direction"]
+        stat_info = f["stat"]
+        if stat_info and stat_info[1] > 0:
+            stat_name, stat_val = stat_info
+            delta = stat_val if "dominant → recessive" in direction else -stat_val
+            sign = "+" if delta > 0 else ""
+            icon = "🟢" if delta > 0 else "🔴"
+            st.markdown(f"  `{coord}` {direction} → {icon} {sign}{delta} {stat_name}")
+        else:
+            st.markdown(f"  `{coord}` {direction} → cosmetic")
+    if net:
+        for stat, delta in sorted(net.items()):
+            sign = "+" if delta > 0 else ""
+            icon = "🟢" if delta > 0 else "🔴"
+            st.markdown(f"  {icon} **{stat}:** {sign}{delta}")
+
+
 def show_cr9_path(path, label):
     """Display a CR9 flip path with stat notes in Streamlit."""
     if path is None or not path["flips"]:
@@ -352,16 +387,20 @@ full_export_input = st.text_area(
     label_visibility="collapsed"
 )
 
-if full_export_input.strip():
-    parsed_export = parse_full_export(full_export_input.strip())
-    if parsed_export:
-        st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}")
-        if parsed_export.get(1): st.session_state["export_cr1"] = parsed_export[1]
-        if parsed_export.get(3): st.session_state["export_cr3"] = parsed_export[3]
-        if parsed_export.get(5): st.session_state["cr5_input"] = parsed_export[5]
-        if parsed_export.get(9): st.session_state["cr9_input"] = parsed_export[9]
+if st.button("📋 Parse it", type="primary"):
+    if full_export_input.strip():
+        parsed_export = parse_full_export(full_export_input.strip())
+        if parsed_export:
+            st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}")
+            if parsed_export.get(1): st.session_state["export_cr1"] = parsed_export[1]
+            if parsed_export.get(3): st.session_state["export_cr3"] = parsed_export[3]
+            if parsed_export.get(5): st.session_state["cr5_input"] = parsed_export[5]
+            if parsed_export.get(9): st.session_state["cr9_input"] = parsed_export[9]
+            st.rerun()
+        else:
+            st.warning("This doesn't look like a full export — use the individual chromosome fields below.")
     else:
-        st.info("This doesn't look like a full export — use the individual chromosome fields below.")
+        st.warning("Paste your genome export above first.")
 
 st.divider()
 
@@ -927,39 +966,6 @@ with col_cr5:
                 st.divider()
                 st.markdown("**Paths to turn glow on:**")
                 paths_speed, paths_stat = glow_on_paths(result["positions"], result["norm"])
-
-                def show_glow_path(path, label):
-                    flips = path["flips"]
-                    net = path["net_stat"]
-                    net_total = path["net_total"]
-                    if not flips:
-                        st.success(f"**{label}:** Already matches a glow-on pattern — no flips needed.")
-                        return
-                    if net_total > 0:
-                        summary = f"{path['flips_count']} flip(s) — 🟢 net +{net_total} stat points"
-                    elif net_total < 0:
-                        summary = f"{path['flips_count']} flip(s) — 🔴 net {net_total} stat points"
-                    else:
-                        summary = f"{path['flips_count']} flip(s) — no net stat change"
-                    st.markdown(f"**{label}:** {summary}")
-                    st.caption(f"Target pattern: `{path['target']}`")
-                    for f in flips:
-                        coord = f["coord"]
-                        direction = f["direction"]
-                        stat_info = f["stat"]
-                        if stat_info and stat_info[1] > 0:
-                            stat_name, stat_val = stat_info
-                            delta = stat_val if "dominant → recessive" in direction else -stat_val
-                            sign = "+" if delta > 0 else ""
-                            icon = "🟢" if delta > 0 else "🔴"
-                            st.markdown(f"  `{coord}` {direction} → {icon} {sign}{delta} {stat_name}")
-                        else:
-                            st.markdown(f"  `{coord}` {direction} → cosmetic")
-                    if net:
-                        for stat, delta in sorted(net.items()):
-                            sign = "+" if delta > 0 else ""
-                            icon = "🟢" if delta > 0 else "🔴"
-                            st.markdown(f"  {icon} **{stat}:** {sign}{delta}")
 
                 # Three fixed sections:
                 # 1. Shortest path to any glow-on
