@@ -753,7 +753,7 @@ with col_cr9:
     st.subheader("CR9 — Particles & Tail Light (20 positions)")
     cr9_input = st.text_input(
         "CR9 genome string",
-        placeholder="e.g. XXXo Xooo XX oo Xooo oXoo",
+        placeholder="e.g. XXXo Xooo XXoo Xooo oXoo",
         key="cr9_input"
     )
     if cr9_input.strip():
