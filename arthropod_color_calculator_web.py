@@ -235,6 +235,57 @@ def calculate_changes(positions, cr, target_color):
 # STREAMLIT UI
 # ============================================================
 
+
+def parse_full_export(text):
+    """Parse a full game genome export and extract relevant chromosomes.
+    Returns dict: {cr_number: normalized_string} for CRs 1, 3, 5, 9.
+    Also handles raw single-chromosome strings (passes through).
+    Game export notation: D=dominant, R=recessive, x=mixed
+    Converted to app notation: D->X, R->o, x->X (mixed counts as dominant for hue)
+    """
+    lines = text.strip().splitlines()
+
+    # Check if this looks like a full export (has [Genes] or lines with NN= format)
+    gene_lines = {}
+    in_genes = False
+    for line in lines:
+        line = line.strip()
+        if line == "[Genes]":
+            in_genes = True
+            continue
+        if line.startswith("[") and line != "[Genes]":
+            in_genes = False
+            continue
+        if in_genes or "=" in line:
+            # Try to parse lines like "01= DRxx RRRR ..."
+            import re
+            m = re.match(r"^(\d+)\s*=\s*(.+)$", line)
+            if m:
+                cr_num = int(m.group(1))
+                raw_genes = m.group(2).replace(" ", "")
+                # Convert D/R/x to X/o/X notation
+                converted = ""
+                for c in raw_genes:
+                    if c.upper() == "D":
+                        converted += "X"
+                    elif c.upper() == "R":
+                        converted += "o"
+                    elif c.lower() == "x":
+                        converted += "X"  # mixed counts as dominant for hue
+                    else:
+                        converted += c
+                gene_lines[cr_num] = converted
+
+    if not gene_lines:
+        # Not a full export — return None so caller handles as raw string
+        return None
+
+    result = {}
+    for cr in [1, 3, 5, 9]:
+        if cr in gene_lines:
+            result[cr] = gene_lines[cr]
+    return result
+
 def show_cr9_path(path, label):
     """Display a CR9 flip path with stat notes in Streamlit."""
     if path is None or not path["flips"]:
@@ -587,57 +638,6 @@ def normalize_genome_str(raw, expected_len):
         else:
             result += "X"
     return result, None
-
-def parse_full_export(text):
-    """Parse a full game genome export and extract relevant chromosomes.
-    Returns dict: {cr_number: normalized_string} for CRs 1, 3, 5, 9.
-    Also handles raw single-chromosome strings (passes through).
-    Game export notation: D=dominant, R=recessive, x=mixed
-    Converted to app notation: D->X, R->o, x->X (mixed counts as dominant for hue)
-    """
-    lines = text.strip().splitlines()
-
-    # Check if this looks like a full export (has [Genes] or lines with NN= format)
-    gene_lines = {}
-    in_genes = False
-    for line in lines:
-        line = line.strip()
-        if line == "[Genes]":
-            in_genes = True
-            continue
-        if line.startswith("[") and line != "[Genes]":
-            in_genes = False
-            continue
-        if in_genes or "=" in line:
-            # Try to parse lines like "01= DRxx RRRR ..."
-            import re
-            m = re.match(r"^(\d+)\s*=\s*(.+)$", line)
-            if m:
-                cr_num = int(m.group(1))
-                raw_genes = m.group(2).replace(" ", "")
-                # Convert D/R/x to X/o/X notation
-                converted = ""
-                for c in raw_genes:
-                    if c.upper() == "D":
-                        converted += "X"
-                    elif c.upper() == "R":
-                        converted += "o"
-                    elif c.lower() == "x":
-                        converted += "X"  # mixed counts as dominant for hue
-                    else:
-                        converted += c
-                gene_lines[cr_num] = converted
-
-    if not gene_lines:
-        # Not a full export — return None so caller handles as raw string
-        return None
-
-    result = {}
-    for cr in [1, 3, 5, 9]:
-        if cr in gene_lines:
-            result[cr] = gene_lines[cr]
-    return result
-
 
 def analyze_cr5(raw):
     """Parse CR5, determine glow on/off, and calculate stat contributions."""
