@@ -476,8 +476,33 @@ def analyze_cr5(raw):
                 expressing.append((coord, stat_name, stat_val))
             else:
                 not_expressing.append((coord, stat_name, stat_val))
-    return {"glow": glow_on, "stat_totals": stat_totals,
+    return {"glow": glow_on, "norm": norm, "stat_totals": stat_totals,
             "expressing": expressing, "not_expressing": not_expressing}, None
+
+
+def glow_on_paths(positions, norm):
+    coords = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
+    paths = []
+    for target_norm in sorted(GLOW_ON_PATTERNS):
+        flips = []
+        net_stat = {}
+        for i, coord in enumerate(coords):
+            current, target = norm[i], target_norm[i]
+            if current == target:
+                continue
+            direction = "recessive → dominant" if target == "X" else "dominant → recessive"
+            stat_info = STAT_GENES_CR5.get(coord)
+            if stat_info and stat_info[1] > 0:
+                stat_name, stat_val = stat_info
+                delta = stat_val if direction == "dominant → recessive" else -stat_val
+                net_stat[stat_name] = net_stat.get(stat_name, 0) + delta
+            flips.append({"coord": coord, "direction": direction, "stat": stat_info})
+        net_total = sum(net_stat.values())
+        paths.append({"target": target_norm, "flips_count": len(flips),
+                      "net_total": net_total, "net_stat": net_stat, "flips": flips})
+    by_speed = sorted(paths, key=lambda p: (p["flips_count"], -p["net_total"]))
+    by_stat  = sorted(paths, key=lambda p: (-p["net_total"], p["flips_count"]))
+    return by_speed, by_stat
 
 
 def lookup_cr9(raw):
@@ -498,6 +523,31 @@ def lookup_cr9(raw):
     else:
         taillight = tl_results
     return {"particle": particle, "taillight": taillight}, None
+
+
+def particle_paths(particle_key):
+    """Find fewest flips to reach each particle type from current pattern."""
+    by_type = {"Tail": [], "Wing": [], "None": []}
+    for pattern, ptype in PARTICLE_LOOKUP.items():
+        if ptype in by_type:
+            by_type[ptype].append(pattern)
+    coords = ["9A1","9A2","9A3","9A4","9B1","9B2","9B3","9B4","9C1","9C2"]
+    results = {}
+    for target_type, patterns in by_type.items():
+        best = None
+        for target_pattern in patterns:
+            if len(target_pattern) != 10:
+                continue
+            flips = []
+            for i, (c, t) in enumerate(zip(particle_key, target_pattern)):
+                if c != t:
+                    direction = "recessive → dominant" if t == "X" else "dominant → recessive"
+                    flips.append({"coord": coords[i], "direction": direction})
+            path = {"target": target_pattern, "flips_count": len(flips), "flips": flips}
+            if best is None or len(flips) < best["flips_count"]:
+                best = path
+        results[target_type] = best
+    return results
 
 
 def visual_traits_menu():
@@ -531,6 +581,52 @@ def visual_traits_menu():
                 for coord, stat_name, stat_val in sorted(result["not_expressing"]):
                     print(f"  {coord}: {stat_val} {stat_name} (off)")
 
+            if not result["glow"]:
+                print()
+                print("-" * 40)
+                print("Paths to turn glow on:")
+                by_speed, by_stat = glow_on_paths(result.get("positions", {}), result["norm"])
+
+                def print_path(p, label):
+                    flips = p["flips"]
+                    net_total = p["net_total"]
+                    sign = f"+{net_total}" if net_total >= 0 else str(net_total)
+                    print(f"  {label}: {p['flips_count']} flip(s), net stat {sign}")
+                    print(f"    Target: {p['target']}")
+                    for f in flips:
+                        coord = f["coord"]
+                        direction = f["direction"]
+                        stat_info = f["stat"]
+                        if stat_info and stat_info[1] > 0:
+                            stat_name, stat_val = stat_info
+                            delta = stat_val if "dominant → recessive" in direction else -stat_val
+                            sign2 = "+" if delta > 0 else ""
+                            print(f"    {coord}: {direction} -> {sign2}{delta} {stat_name}")
+                        else:
+                            print(f"    {coord}: {direction} -> cosmetic")
+                    if p["net_stat"]:
+                        for stat, delta in sorted(p["net_stat"].items()):
+                            sign2 = "+" if delta > 0 else ""
+                            print(f"    Total {stat}: {sign2}{delta}")
+
+                fastest = by_speed[0]
+                best = by_stat[0]
+                print()
+                print("  --- Fewest flips ---")
+                print_path(fastest, "Fastest")
+                if best["target"] != fastest["target"]:
+                    print()
+                    print("  --- Best stat outcome ---")
+                    print_path(best, "Best stat")
+                else:
+                    print("  (Fastest path is also the best stat outcome)")
+                remaining = [p for p in by_speed[1:] if p["target"] != best["target"]]
+                if remaining:
+                    print()
+                    print("  --- Other options ---")
+                    for p in remaining:
+                        print_path(p, f"Pattern {p['target']}")
+
     print()
     print("-" * 55)
     print("CR9 — Particles & Tail Light (20 positions)")
@@ -542,7 +638,8 @@ def visual_traits_menu():
             print(f"Error: {err}")
         else:
             print()
-            print(f"Particles: {result['particle']}")
+            p = result["particle"]
+            print(f"Particles: {p}")
             tl = result["taillight"]
             if tl == ["Unknown"]:
                 print("Tail light: Unknown")
@@ -552,6 +649,27 @@ def visual_traits_menu():
                 print("  Needs more data. If you can confirm the color, share with Kaskrim.")
             else:
                 print(f"Tail light: {tl[0]}")
+
+            # Particle path recommendations
+            norm_cr9, _ = normalize_str(cr9_raw, 20)
+            if norm_cr9:
+                particle_key = norm_cr9[:10]
+                print()
+                print("Target particle type (Tail / Wing / None, or Enter to skip):")
+                target_p = input("Target: ").strip().capitalize()
+                if target_p in ("Tail", "Wing", "None"):
+                    if target_p == p:
+                        print(f"Already {target_p} particles — no flips needed.")
+                    else:
+                        paths = particle_paths(particle_key)
+                        best = paths.get(target_p)
+                        if best is None or not best["flips"]:
+                            print(f"No known pattern for {target_p} in research data.")
+                        else:
+                            print(f"Fewest flips to {target_p}: {best['flips_count']} flip(s)")
+                            print(f"  Target pattern: {best['target']}")
+                            for f in best["flips"]:
+                                print(f"  {f['coord']}: {f['direction']}")
     print()
     input("Press Enter to return.")
 
