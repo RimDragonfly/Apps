@@ -425,6 +425,8 @@ PARTICLE_LOOKUP = {
     "XooXXXXXXX": "Wing",
     "oXoXXXXXXX": "Wing",
     "ooXXXXXXXX": "Wing",
+    "XooooooooX": "None",
+    "XXXXXXXXXX": "None",
 }
 
 TAILLIGHT_LOOKUP = {
@@ -539,8 +541,6 @@ def lookup_cr9(raw):
     taillight_key = norm[10:]
     if particle_key in PARTICLE_LOOKUP:
         particle = PARTICLE_LOOKUP[particle_key]
-    elif all(c == "X" for c in particle_key[:2]) and particle_key[8:10] == "XX":
-        particle = "Tail"
     else:
         particle = "Unknown"
     tl_results = TAILLIGHT_LOOKUP.get(taillight_key, None)
@@ -729,21 +729,27 @@ def visual_traits_menu():
 
                 fastest = by_speed[0]
                 best = by_stat[0]
+                def loses_both(path):
+                    net = path["net_stat"]
+                    return net.get("Ferocity", 0) < 0 and net.get("Friendliness", 0) < 0
+
+                fastest = by_speed[0]
                 print()
-                print("  --- Fewest flips ---")
-                print_path(fastest, "Fastest")
-                if best["target"] != fastest["target"]:
+                print("  --- Shortest path ---")
+                print_path(fastest, "Shortest")
+
+                alternatives = [
+                    p for p in by_speed
+                    if p["target"] != fastest["target"]
+                    and not (loses_both(p) and not loses_both(fastest))
+                ]
+                if alternatives:
                     print()
-                    print("  --- Best stat outcome ---")
-                    print_path(best, "Best stat")
-                else:
-                    print("  (Fastest path is also the best stat outcome)")
-                remaining = [p for p in by_speed[1:] if p["target"] != best["target"]]
-                if remaining:
-                    print()
-                    print("  --- Other options ---")
-                    for p in remaining:
-                        print_path(p, f"Pattern {p['target']}")
+                    print("  --- Alternatives (more flips, better stats) ---")
+                    for p in alternatives:
+                        print_path(p, f"Alternative ({p['flips_count']} flip(s))")
+                elif not loses_both(fastest):
+                    print("  (No better-stat alternatives available)")
 
     print()
     print("-" * 55)
@@ -773,7 +779,7 @@ def visual_traits_menu():
             if norm_cr9:
                 particle_key = norm_cr9[:10]
                 print()
-                print("Target particle type (Tail / Wing / None, or Enter to skip):")
+                print("Target particle location (Tail / Wing / None, or Enter to skip):")
                 target_p = input("Target: ").strip().capitalize()
                 if target_p in ("Tail", "Wing", "None"):
                     if target_p == p:

@@ -492,7 +492,9 @@ PARTICLE_LOOKUP = {
     "XooXXXXXXX": "Wing",
     "oXoXXXXXXX": "Wing",
     "ooXXXXXXXX": "Wing",
-    # No particles (sample — not exhaustive, used as fallback)
+    # No particles
+    "XooooooooX": "None",
+    "XXXXXXXXXX": "None",
 }
 
 # ---- CR9 TAIL LIGHT LOOKUP ----
@@ -653,8 +655,6 @@ def lookup_cr9(raw):
     # Particle result
     if particle_key in PARTICLE_LOOKUP:
         particle = PARTICLE_LOOKUP[particle_key]
-    elif all(c == "X" for c in particle_key[:2]) and particle_key[8:10] == "XX":
-        particle = "Tail"
     else:
         particle = "Unknown"
 
@@ -720,7 +720,7 @@ def _build_paths(current_key, target_patterns, coords, stat_genes):
 
 
 def particle_paths(particle_key):
-    """For each known particle type, return (fastest, best_stat) path dicts."""
+    """For each known particle location, return (fastest, best_stat) path dicts."""
     by_type = {"Tail": [], "Wing": [], "None": []}
     for pattern, ptype in PARTICLE_LOOKUP.items():
         if ptype in by_type:
@@ -755,7 +755,7 @@ st.divider()
 st.header("🐝 Visual Traits — CR5 & CR9")
 st.caption("Glow (CR5) · Particles & Tail Light (CR9)")
 st.markdown("""
-Paste your CR5 and CR9 genome strings to look up glow, particle type, and tail light color.
+Paste your CR5 and CR9 genome strings to look up glow, particle location, and tail light color.
 These are lookup tables — results not in the research data will show as **Unknown** or **Glow off**.
 """)
 
@@ -883,25 +883,33 @@ with col_cr5:
                             icon = "🟢" if delta > 0 else "🔴"
                             st.markdown(f"  {icon} **{stat}:** {sign}{delta}")
 
-                # Show fastest and best stat — collapse duplicates if they're the same path
+                # Show shortest path first
                 fastest = paths_speed[0]
-                best_stat = paths_stat[0]
+                min_flips = fastest["flips_count"]
 
-                st.markdown("##### ⚡ Fewest flips")
-                show_glow_path(fastest, "Fastest path")
+                st.markdown("##### ⚡ Shortest path")
+                show_glow_path(fastest, "Shortest path")
 
-                if best_stat["target"] != fastest["target"]:
-                    st.markdown("##### 📈 Best stat outcome")
-                    show_glow_path(best_stat, "Best stat path")
-                else:
-                    st.caption("The fastest path is also the best stat outcome.")
+                # Show all alternatives that are NOT the shortest path
+                # but have a better stat outcome than the shortest
+                # Exclude any path that loses BOTH Ferocity AND Friendliness
+                # unless it is the only shortest path
+                def loses_both(path):
+                    net = path["net_stat"]
+                    return net.get("Ferocity", 0) < 0 and net.get("Friendliness", 0) < 0
 
-                # Show remaining options collapsed
-                remaining = [p for p in paths_speed[1:] if p["target"] != best_stat["target"]]
-                if remaining:
-                    with st.expander(f"Other options ({len(remaining)} more)"):
-                        for p in remaining:
-                            show_glow_path(p, f"Pattern `{p['target']}`")
+                alternatives = [
+                    p for p in paths_speed
+                    if p["target"] != fastest["target"]
+                    and not (loses_both(p) and not loses_both(fastest))
+                ]
+
+                if alternatives:
+                    st.markdown("##### 🔀 Alternatives (more flips, better stats)")
+                    for p in alternatives:
+                        show_glow_path(p, f"Alternative ({p['flips_count']} flip(s))")
+                elif not loses_both(fastest):
+                    st.caption("No better-stat alternatives available.")
 
 with col_cr9:
     st.subheader("CR9 — Particles & Tail Light (20 positions)")
@@ -942,12 +950,12 @@ with col_cr9:
 
             # ---- Particle target dropdown ----
             st.divider()
-            st.markdown("**Change particle type:**")
+            st.markdown("**Change particle location:**")
             particle_options = ["Tail", "Wing", "None"]
             current_label = p if p in particle_options else None
             default_idx = particle_options.index(current_label) if current_label in particle_options else 0
             target_particle = st.selectbox(
-                "Target particle type",
+                "Target particle location",
                 options=particle_options,
                 index=default_idx,
                 key="target_particle",
@@ -979,7 +987,7 @@ with col_cr9:
                         if target_particle == "None":
                             st.info("No-particle states are achievable but the research data in this app doesn't yet include documented patterns to aim for. Check back as more data is added.")
                         else:
-                            st.info("No known pattern available for this particle type.")
+                            st.info("No known pattern available for this particle location.")
                     else:
                         st.markdown("##### ⚡ Fewest flips")
                         show_cr9_path(fastest, "Fastest path")
