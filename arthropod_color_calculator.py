@@ -310,22 +310,43 @@ def main():
     print("!! IMPORTANT: Genetics skill must be uncapped at level 100.")
     print("Do not use this tool with a genome that contains ? marks.")
     print()
-    print("Chromosome options:")
-    print("  1 = CR1 (body color hue)")
-    print("  3 = CR3 (wing color hue)")
+    print("You can paste a full genome export or individual chromosome strings.")
+    print("Both D/R/x (game export) and X/o/t (internal) notation are accepted.")
     print()
+    print("Paste a full genome export now, or press Enter to enter chromosomes manually.")
+    export_raw = input("Full export (or Enter to skip): ").strip()
 
-    while True:
-        cr_input = input("Chromosome (1 or 3): ").strip()
-        if cr_input in ("1", "3"):
-            chromosome = int(cr_input)
-            break
-        print("  Please enter 1 or 3.")
+    parsed_export = None
+    if export_raw:
+        parsed_export = parse_full_export(export_raw)
+        if parsed_export:
+            print(f"Export parsed — found: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}")
+        else:
+            print("Doesn't look like a full export — continuing manually.")
 
-    print()
-    print("Enter the 40-position genome string.")
-    print("Spaces are fine. o=recessive, x/X/t/D=dominant or mixed.")
-    raw = input("Genome: ").strip()
+    if parsed_export and 1 in parsed_export:
+        print(f"\nCR1 (body color) extracted: {parsed_export[1]}")
+        chromosome = 1
+        raw = parsed_export[1]
+    elif parsed_export and 3 in parsed_export:
+        chromosome = 3
+        raw = parsed_export[3]
+    else:
+        print()
+        print("Chromosome options:")
+        print("  1 = CR1 (body color hue)")
+        print("  3 = CR3 (wing color hue)")
+        print()
+        while True:
+            cr_input = input("Chromosome (1 or 3): ").strip()
+            if cr_input in ("1", "3"):
+                chromosome = int(cr_input)
+                break
+            print("  Please enter 1 or 3.")
+        print()
+        print("Enter the 40-position genome string.")
+        print("Spaces are fine. D/R/x or o/X/t notation both work.")
+        raw = input("Genome: ").strip()
 
     try:
         positions, groups = parse_genome(raw, chromosome)
@@ -367,7 +388,7 @@ def main():
     print()
     another = input("Check visual traits (glow/particles/tail light)? [y/N]: ").strip().lower()
     if another == "y":
-        visual_traits_menu()
+        visual_traits_menu(parsed_export=parsed_export)
 
     print()
     input("Press Enter to exit.")
@@ -478,6 +499,45 @@ def normalize_str(raw, expected_len):
     if len(cleaned) != expected_len:
         return None, f"Expected {expected_len} positions, got {len(cleaned)}."
     return "".join("o" if c.lower() in ("o", "r") else "X" for c in cleaned), None
+
+
+def parse_full_export(text):
+    """Parse a full game genome export and extract relevant chromosomes.
+    Returns dict: {cr_number: normalized_string} for CRs 1, 3, 5, 9.
+    Game export notation: D=dominant, R=recessive, x=mixed
+    Converted to app notation: D->X, R->o, x->X
+    """
+    import re
+    lines = text.strip().splitlines()
+    gene_lines = {}
+    in_genes = False
+    for line in lines:
+        line = line.strip()
+        if line == "[Genes]":
+            in_genes = True
+            continue
+        if line.startswith("[") and line != "[Genes]":
+            in_genes = False
+            continue
+        if in_genes or "=" in line:
+            m = re.match(r"^(\d+)\s*=\s*(.+)$", line)
+            if m:
+                cr_num = int(m.group(1))
+                raw_genes = m.group(2).replace(" ", "")
+                converted = ""
+                for c in raw_genes:
+                    if c.upper() == "D":
+                        converted += "X"
+                    elif c.upper() == "R":
+                        converted += "o"
+                    elif c.lower() == "x":
+                        converted += "X"
+                    else:
+                        converted += c
+                gene_lines[cr_num] = converted
+    if not gene_lines:
+        return None
+    return {cr: gene_lines[cr] for cr in [1, 3, 5, 9] if cr in gene_lines}
 
 
 def analyze_cr5(raw):
@@ -616,15 +676,19 @@ def taillight_paths(taillight_key):
     return results
 
 
-def visual_traits_menu():
+def visual_traits_menu(parsed_export=None):
     print()
     print("=" * 55)
     print("  Visual Traits — CR5 & CR9")
     print("=" * 55)
     print()
     print("CR5 — Glow (10 positions)")
-    print("Enter genome string (spaces OK, o/R=recessive, else dominant):")
-    cr5_raw = input("CR5 genome: ").strip()
+    if parsed_export and 5 in parsed_export:
+        cr5_raw = parsed_export[5]
+        print(f"Using exported CR5: {cr5_raw}")
+    else:
+        print("Enter genome string (spaces OK, D/R/x or o/X/t notation):")
+        cr5_raw = input("CR5 genome: ").strip()
     if cr5_raw:
         result, err = analyze_cr5(cr5_raw)
         if err:
@@ -769,8 +833,12 @@ def visual_traits_menu():
     print()
     print("-" * 55)
     print("CR9 — Particles & Tail Light (20 positions)")
-    print("Enter genome string (spaces OK):")
-    cr9_raw = input("CR9 genome: ").strip()
+    if parsed_export and 9 in parsed_export:
+        cr9_raw = parsed_export[9]
+        print(f"Using exported CR9: {cr9_raw}")
+    else:
+        print("Enter genome string (spaces OK, D/R/x or o/X/t notation):")
+        cr9_raw = input("CR9 genome: ").strip()
     if cr9_raw:
         result, err = lookup_cr9(cr9_raw)
         if err:

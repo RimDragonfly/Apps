@@ -280,12 +280,37 @@ st.caption("Project Gorgon Genetics Research · Kaskrim & Azizah · Lumière")
 
 st.markdown("""
 Calculate the minimum changes needed to reach a target body or wing color.
-Paste your genome export directly from the game.
 
-**Notation:** `o` or `R` = recessive · everything else = dominant or mixed
+**You can paste either:**
+- A single chromosome string (40 positions for CR1/CR3, 10 for CR5, 20 for CR9)
+- Your full game genome export — the app will extract all relevant chromosomes automatically
+
+**Notation:** The app accepts both game export format (`D` `R` `x`) and internal format (`X` `o` `t`) — both work.
 """)
 
 st.warning("⚠️ **Genetics skill must be uncapped at level 100.** Do not use this tool with a genome that contains ? marks.")
+
+# ── Full export paste ──────────────────────────────────────────────────────
+st.markdown("### 📋 Paste Full Genome Export")
+st.markdown("If you have the full game export, paste it here and all chromosomes will be filled in automatically.")
+full_export_input = st.text_area(
+    "Full genome export",
+    placeholder="Paste everything here — starting from [Overview] or [Genes] — and the app will do the rest.",
+    height=150,
+    key="full_export_input",
+    label_visibility="collapsed"
+)
+
+if full_export_input.strip():
+    parsed_export = parse_full_export(full_export_input.strip())
+    if parsed_export:
+        st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}")
+        st.session_state["export_cr1"] = parsed_export.get(1, "")
+        st.session_state["export_cr3"] = parsed_export.get(3, "")
+        st.session_state["export_cr5"] = parsed_export.get(5, "")
+        st.session_state["export_cr9"] = parsed_export.get(9, "")
+    else:
+        st.info("This doesn't look like a full export — use the individual chromosome fields below.")
 
 st.divider()
 
@@ -306,9 +331,12 @@ with col2:
         index=0
     )
 
+_cr_key = "export_cr1" if cr == 1 else "export_cr3"
+_prefill = st.session_state.get(_cr_key, "")
 genome_input = st.text_input(
     "Genome string (40 positions, spaces OK)",
-    placeholder="e.g. oooo Xooo ooXo oooo oooX XoXo XoXX XXXX XXXX Xooo"
+    placeholder="e.g. RRRR DRRR RRDR RRRR RRRX DRDx DRDD DDDD DDDD RRRD",
+    value=_prefill,
 )
 
 if genome_input.strip():
@@ -560,6 +588,57 @@ def normalize_genome_str(raw, expected_len):
             result += "X"
     return result, None
 
+def parse_full_export(text):
+    """Parse a full game genome export and extract relevant chromosomes.
+    Returns dict: {cr_number: normalized_string} for CRs 1, 3, 5, 9.
+    Also handles raw single-chromosome strings (passes through).
+    Game export notation: D=dominant, R=recessive, x=mixed
+    Converted to app notation: D->X, R->o, x->X (mixed counts as dominant for hue)
+    """
+    lines = text.strip().splitlines()
+
+    # Check if this looks like a full export (has [Genes] or lines with NN= format)
+    gene_lines = {}
+    in_genes = False
+    for line in lines:
+        line = line.strip()
+        if line == "[Genes]":
+            in_genes = True
+            continue
+        if line.startswith("[") and line != "[Genes]":
+            in_genes = False
+            continue
+        if in_genes or "=" in line:
+            # Try to parse lines like "01= DRxx RRRR ..."
+            import re
+            m = re.match(r"^(\d+)\s*=\s*(.+)$", line)
+            if m:
+                cr_num = int(m.group(1))
+                raw_genes = m.group(2).replace(" ", "")
+                # Convert D/R/x to X/o/X notation
+                converted = ""
+                for c in raw_genes:
+                    if c.upper() == "D":
+                        converted += "X"
+                    elif c.upper() == "R":
+                        converted += "o"
+                    elif c.lower() == "x":
+                        converted += "X"  # mixed counts as dominant for hue
+                    else:
+                        converted += c
+                gene_lines[cr_num] = converted
+
+    if not gene_lines:
+        # Not a full export — return None so caller handles as raw string
+        return None
+
+    result = {}
+    for cr in [1, 3, 5, 9]:
+        if cr in gene_lines:
+            result[cr] = gene_lines[cr]
+    return result
+
+
 def analyze_cr5(raw):
     """Parse CR5, determine glow on/off, and calculate stat contributions."""
     norm, err = normalize_genome_str(raw, 10)
@@ -759,10 +838,12 @@ col_cr5, col_cr9 = st.columns(2)
 
 with col_cr5:
     st.subheader("CR5 — Glow (10 positions)")
+    _cr5_prefill = st.session_state.get("export_cr5", "")
     cr5_input = st.text_input(
         "CR5 genome string",
-        placeholder="e.g. oooo oXXX Xo",
-        key="cr5_input"
+        placeholder="e.g. RRRR RDxR DR",
+        key="cr5_input",
+        value=_cr5_prefill,
     )
     if cr5_input.strip():
         result, err = analyze_cr5(cr5_input.strip())
@@ -915,10 +996,12 @@ with col_cr5:
 
 with col_cr9:
     st.subheader("CR9 — Particles & Tail Light (20 positions)")
+    _cr9_prefill = st.session_state.get("export_cr9", "")
     cr9_input = st.text_input(
         "CR9 genome string",
-        placeholder="e.g. XXXo Xooo XXoo Xooo oXoo",
-        key="cr9_input"
+        placeholder="e.g. DDxD DRxR xDRR DRRR RRRR",
+        key="cr9_input",
+        value=_cr9_prefill,
     )
     if cr9_input.strip():
         result, err = lookup_cr9(cr9_input.strip())
