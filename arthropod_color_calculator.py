@@ -366,7 +366,194 @@ def main():
     calculate_changes(positions, chromosome, target)
 
     print()
+    another = input("Check visual traits (glow/particles/tail light)? [y/N]: ").strip().lower()
+    if another == "y":
+        visual_traits_menu()
+
+    print()
     input("Press Enter to exit.")
+
+# ============================================================
+# CR5 GLOW + CR9 PARTICLES & TAIL LIGHT
+# ============================================================
+
+STAT_GENES_CR5 = {
+    "5A2": ("Friendliness", 4),
+    "5A4": ("Enthusiasm",   4),
+    "5B1": ("Intelligence", 4),
+    "5B2": ("Intelligence", 2),
+    "5B3": ("Friendliness", 3),
+    "5B4": ("Ferocity",     1),
+    "5C2": ("Toughness",    7),
+}
+
+GLOW_ON_PATTERNS = {
+    "oooooXXXXo",
+    "oooooXXooo",
+    "oooooXXoXo",
+    "oooooXoXoo",
+}
+
+PARTICLE_LOOKUP = {
+    "XXXXXooXXX": "Tail",
+    "XXXXXoXoXX": "Tail",
+    "XXXXXXooXX": "Tail",
+    "XXXXoooXXX": "Tail",
+    "XXXoXoXoXo": "Tail",
+    "XXXoXooXXX": "Tail",
+    "XXXoXoooXX": "Tail",
+    "XXXoooooXX": "Tail",
+    "XXoXXoooXX": "Tail",
+    "XXooXoooоX": "Tail",
+    "XoXXXoooXX": "Tail",
+    "XooXXXXXXX": "Wing",
+    "oXoXXXXXXX": "Wing",
+    "ooXXXXXXXX": "Wing",
+}
+
+TAILLIGHT_LOOKUP = {
+    "oXXooXooXo": ["Wave Teal"],
+    "oXXXoooXoo": ["Poison Green"],
+    "ooooXoXooo": ["Poison Green"],
+    "ooXXXooXoo": ["Poison Green"],
+    "ooooXXoXoX": ["Golden Yellow"],
+    "ooooXoXXoX": ["Golden Yellow"],
+    "ooooXoXoXX": ["Golden Yellow"],
+    "ooooXooXoX": ["Golden Yellow", "Firey Pink"],
+    "oXoXooXooX": ["Aqua Blue"],
+    "ooooXooooX": ["Aqua Blue", "None"],
+    "oXooooXoXX": ["Aqua Blue"],
+    "oXooooooXX": ["Red Orange"],
+    "oXoXoXXXXX": ["Red Orange"],
+    "oXXoXoXXoX": ["Firey Pink"],
+    "oXoXoXXXXo": ["Firey Pink"],
+    "oXoXoXXXoX": ["Firey Pink"],
+    "ooooXoooXX": ["Firey Pink", "None"],
+    "oXoXXXXooX": ["Galaxy Purple"],
+    "oXoXXooooo": ["Galaxy Purple"],
+    "ooooXoXXXX": ["Galaxy Purple", "White Frosty"],
+    "ooooXoXXoX": ["Galaxy Purple"],
+    "ooooXooXXX": ["Galaxy Purple"],
+    "ooooooooXX": ["Galaxy Purple"],
+    "ooooXooooo": ["White/Purp/Teal"],
+    "XXooooXooX": ["White/Purp/Teal"],
+    "oXooXooXoo": ["White/Purp/Teal"],
+    "ooooXXoooX": ["White Noise"],
+    "ooooXoXooX": ["White Noise"],
+    "oXooooooXo": ["None"],
+    "oXooooXoXo": ["None"],
+    "oXooXooXXo": ["None"],
+}
+
+
+def normalize_str(raw, expected_len):
+    cleaned = raw.replace(" ", "")
+    if len(cleaned) != expected_len:
+        return None, f"Expected {expected_len} positions, got {len(cleaned)}."
+    return "".join("o" if c.lower() in ("o", "r") else "X" for c in cleaned), None
+
+
+def analyze_cr5(raw):
+    norm, err = normalize_str(raw, 10)
+    if err:
+        return None, err
+    labels_sizes = [("A", 4), ("B", 4), ("C", 2)]
+    positions = {}
+    idx = 0
+    for label, size in labels_sizes:
+        for pos in range(1, size + 1):
+            positions[f"5{label}{pos}"] = norm[idx]
+            idx += 1
+    glow_on = norm in GLOW_ON_PATTERNS
+    stat_totals = {}
+    expressing = []
+    not_expressing = []
+    for coord, state in positions.items():
+        if coord in STAT_GENES_CR5:
+            stat_name, stat_val = STAT_GENES_CR5[coord]
+            if state == "o":
+                stat_totals[stat_name] = stat_totals.get(stat_name, 0) + stat_val
+                expressing.append((coord, stat_name, stat_val))
+            else:
+                not_expressing.append((coord, stat_name, stat_val))
+    return {"glow": glow_on, "stat_totals": stat_totals,
+            "expressing": expressing, "not_expressing": not_expressing}, None
+
+
+def lookup_cr9(raw):
+    norm, err = normalize_str(raw, 20)
+    if err:
+        return None, err
+    particle_key = norm[:10]
+    taillight_key = norm[10:]
+    if particle_key in PARTICLE_LOOKUP:
+        particle = PARTICLE_LOOKUP[particle_key]
+    elif all(c == "X" for c in particle_key[:2]) and particle_key[8:10] == "XX":
+        particle = "Tail"
+    else:
+        particle = "Unknown"
+    tl_results = TAILLIGHT_LOOKUP.get(taillight_key, None)
+    if tl_results is None:
+        taillight = ["Unknown"]
+    else:
+        taillight = tl_results
+    return {"particle": particle, "taillight": taillight}, None
+
+
+def visual_traits_menu():
+    print()
+    print("=" * 55)
+    print("  Visual Traits — CR5 & CR9")
+    print("=" * 55)
+    print()
+    print("CR5 — Glow (10 positions)")
+    print("Enter genome string (spaces OK, o/R=recessive, else dominant):")
+    cr5_raw = input("CR5 genome: ").strip()
+    if cr5_raw:
+        result, err = analyze_cr5(cr5_raw)
+        if err:
+            print(f"Error: {err}")
+        else:
+            print()
+            print(f"Glow: {'ON' if result['glow'] else 'Off'}")
+            print()
+            print("CR5 stat contributions (recessive positions):")
+            if result["expressing"]:
+                for coord, stat_name, stat_val in sorted(result["expressing"]):
+                    print(f"  {coord}: +{stat_val} {stat_name}")
+                print("Totals from CR5:")
+                for stat, total in sorted(result["stat_totals"].items()):
+                    print(f"  {stat}: +{total}")
+            else:
+                print("  No stat genes expressing on CR5.")
+            if result["not_expressing"]:
+                print("Not expressing (dominant):")
+                for coord, stat_name, stat_val in sorted(result["not_expressing"]):
+                    print(f"  {coord}: {stat_val} {stat_name} (off)")
+
+    print()
+    print("-" * 55)
+    print("CR9 — Particles & Tail Light (20 positions)")
+    print("Enter genome string (spaces OK):")
+    cr9_raw = input("CR9 genome: ").strip()
+    if cr9_raw:
+        result, err = lookup_cr9(cr9_raw)
+        if err:
+            print(f"Error: {err}")
+        else:
+            print()
+            print(f"Particles: {result['particle']}")
+            tl = result["taillight"]
+            if tl == ["Unknown"]:
+                print("Tail light: Unknown")
+                print("  Pattern not in research data. Share with Kaskrim if confirmed.")
+            elif len(tl) > 1:
+                print(f"Tail light: AMBIGUOUS — {' or '.join(tl)}")
+                print("  Needs more data. If you can confirm the color, share with Kaskrim.")
+            else:
+                print(f"Tail light: {tl[0]}")
+    print()
+    input("Press Enter to return.")
 
 if __name__ == "__main__":
     main()

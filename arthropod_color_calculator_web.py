@@ -387,8 +387,274 @@ st.divider()
 st.markdown("""
 <small>
 Color ladder based on research by Kaskrim and Azizah, 2021–2026.
-F-J dominant or mixed sets broad hue position. A-E dominant or mixed fine-tunes within the zone.
-More dominant or mixed = clockwise on the color wheel. Less = counterclockwise.
+F-J dominant or mixed sets broad hue position (more F-J = clockwise = toward purple/blue).
+A-E dominant or mixed fine-tunes within the zone (more A-E = counterclockwise = toward warmer colors).
+The two axes push in opposite directions.
+</small>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# CR5 GLOW + CR9 PARTICLES & TAIL LIGHT
+# ============================================================
+
+# ---- CR5 STAT GENE MAP ----
+# Position: (stat_name, point_value)
+# A1, A3, C1 are cosmetic (_)
+STAT_GENES_CR5 = {
+    "5A2": ("Friendliness", 4),
+    "5A4": ("Enthusiasm",   4),
+    "5B1": ("Intelligence", 4),
+    "5B2": ("Intelligence", 2),
+    "5B3": ("Friendliness", 3),
+    "5B4": ("Ferocity",     1),
+    "5C2": ("Toughness",    7),
+}
+
+# CR5 glow-on patterns (normalized, 10 chars)
+# Anything not in this set = glow off
+GLOW_ON_PATTERNS = {
+    "oooooXXXXo",  # glow on
+    "oooooXXooo",  # glow on
+    "oooooXXoXo",  # glow on
+    "oooooXoXoo",  # glow on
+}
+
+# ---- CR9 PARTICLE LOOKUP ----
+# Uses first 10 positions of CR9 (A1-A4, B1-B4, C1-C2)
+# Key: 10-char normalized string
+# Value: "Tail" | "Wing" | "None"
+PARTICLE_LOOKUP = {
+    # Tail particles
+    "XXXXXooXXX": "Tail",
+    "XXXXXoXoXX": "Tail",
+    "XXXXXXooXX": "Tail",
+    "XXXXoooXXX": "Tail",
+    "XXXoXoXoXo": "Tail",
+    "XXXoXooXXX": "Tail",
+    "XXXoXoooXX": "Tail",
+    "XXXoooooXX": "Tail",
+    "XXoXXoooXX": "Tail",
+    "XXooXoooоX": "Tail",
+    "XoXXXoooXX": "Tail",
+    # Wing particles
+    "XooXXXXXXX": "Wing",
+    "oXoXXXXXXX": "Wing",
+    "ooXXXXXXXX": "Wing",
+    # No particles (sample — not exhaustive, used as fallback)
+}
+
+# ---- CR9 TAIL LIGHT LOOKUP ----
+# Uses last 10 positions of CR9 (C3-C4, D1-D4, E1-E4)
+# Key: 10-char normalized string
+# Value: color name string
+# Tail light lookup: key -> list of possible colors
+# Entries with multiple colors mean the pattern is ambiguous — needs more data
+TAILLIGHT_LOOKUP = {
+    "oXXooXooXo": ["Wave Teal"],
+    "oXXoXoooоX": ["Wave Teal"],
+    "oXXXoooXoo": ["Poison Green"],
+    "ooooXoXooo": ["Poison Green"],
+    "ooXXXooXoo": ["Poison Green"],
+    "ooooXXoXoX": ["Golden Yellow"],
+    "ooooXoXXoX": ["Golden Yellow"],
+    "ooooXoXoXX": ["Golden Yellow"],
+    "ooooXooXoX": ["Golden Yellow", "Firey Pink"],  # ambiguous — needs more data
+    "oXooooooоX": ["Aqua Blue"],
+    "oXoXooXooX": ["Aqua Blue"],
+    "ooooXooooX": ["Aqua Blue", "None"],            # ambiguous — needs more data
+    "oXooooXoXX": ["Aqua Blue"],
+    "ooooоXXooX": ["Aqua Blue"],
+    "oXooooooXX": ["Red Orange"],
+    "oXoXoXXXXX": ["Red Orange"],
+    "oXXoXoXXoX": ["Firey Pink"],
+    "oXoXoXXXXo": ["Firey Pink"],
+    "oXoXoXXXoX": ["Firey Pink"],
+    "ooooXoooXX": ["Firey Pink", "None"],           # ambiguous — needs more data
+    "oXoXXXXooX": ["Galaxy Purple"],
+    "oXoXXoooоX": ["Galaxy Purple"],
+    "oXoXXooooo": ["Galaxy Purple"],
+    "ooooXoXXXX": ["Galaxy Purple", "White Frosty"], # ambiguous — needs more data
+    "ooooXoXXoX": ["Galaxy Purple"],
+    "ooooXooXXX": ["Galaxy Purple"],
+    "ooooooooXX": ["Galaxy Purple"],
+    "oXooooooоX": ["White/Purp/Teal"],
+    "ooooXooooo": ["White/Purp/Teal"],
+    "XXooooXooX": ["White/Purp/Teal"],
+    "oXooXooXoo": ["White/Purp/Teal"],
+    "ooooXXoooX": ["White Noise"],
+    "ooooXoXooX": ["White Noise"],
+    "ooooXoooоX": ["White Noise"],
+    "ooooooooоX": ["None"],
+    "oXooooooXo": ["None"],
+    "oXooooXoXo": ["None"],
+    "oXooXooXXo": ["None"],
+}
+
+def normalize_genome_str(raw, expected_len):
+    """Normalize a genome string to o/X notation, strip spaces."""
+    cleaned = raw.replace(" ", "")
+    if len(cleaned) != expected_len:
+        return None, f"Expected {expected_len} positions, got {len(cleaned)}."
+    result = ""
+    for c in cleaned:
+        if c.lower() in ("o", "r"):
+            result += "o"
+        else:
+            result += "X"
+    return result, None
+
+def analyze_cr5(raw):
+    """Parse CR5, determine glow on/off, and calculate stat contributions."""
+    norm, err = normalize_genome_str(raw, 10)
+    if err:
+        return None, err
+
+    labels_sizes = [("A", 4), ("B", 4), ("C", 2)]
+    positions = {}
+    idx = 0
+    for label, size in labels_sizes:
+        for pos in range(1, size + 1):
+            coord = f"5{label}{pos}"
+            positions[coord] = norm[idx]
+            idx += 1
+
+    glow_on = norm in GLOW_ON_PATTERNS
+
+    stat_totals = {}
+    expressing = []
+    not_expressing = []
+    for coord, state in positions.items():
+        if coord in STAT_GENES_CR5:
+            stat_name, stat_val = STAT_GENES_CR5[coord]
+            if state == "o":
+                stat_totals[stat_name] = stat_totals.get(stat_name, 0) + stat_val
+                expressing.append((coord, stat_name, stat_val))
+            else:
+                not_expressing.append((coord, stat_name, stat_val))
+
+    return {
+        "glow": glow_on,
+        "positions": positions,
+        "stat_totals": stat_totals,
+        "expressing": expressing,
+        "not_expressing": not_expressing,
+    }, None
+
+def lookup_cr9(raw):
+    norm, err = normalize_genome_str(raw, 20)
+    if err:
+        return None, err
+    particle_key = norm[:10]
+    taillight_key = norm[10:]
+
+    # Particle result
+    if particle_key in PARTICLE_LOOKUP:
+        particle = PARTICLE_LOOKUP[particle_key]
+    elif all(c == "X" for c in particle_key[:2]) and particle_key[8:10] == "XX":
+        particle = "Tail"
+    else:
+        particle = "Unknown"
+
+    # Tail light result — returns a list; multiple entries = ambiguous
+    taillight_results = TAILLIGHT_LOOKUP.get(taillight_key, None)
+    if taillight_results is None:
+        taillight = ["Unknown"]
+        ambiguous = False
+    else:
+        taillight = taillight_results
+        ambiguous = len(taillight_results) > 1
+
+    return {"particle": particle, "taillight": taillight, "taillight_ambiguous": ambiguous}, None
+
+
+# ============================================================
+# CR5 / CR9 UI SECTION
+# ============================================================
+
+st.divider()
+st.header("🐝 Visual Traits — CR5 & CR9")
+st.caption("Glow (CR5) · Particles & Tail Light (CR9)")
+st.markdown("""
+Paste your CR5 and CR9 genome strings to look up glow, particle type, and tail light color.
+These are lookup tables — results not in the research data will show as **Unknown** or **Glow off**.
+""")
+
+col_cr5, col_cr9 = st.columns(2)
+
+with col_cr5:
+    st.subheader("CR5 — Glow (10 positions)")
+    cr5_input = st.text_input(
+        "CR5 genome string",
+        placeholder="e.g. oooo oXXX Xo",
+        key="cr5_input"
+    )
+    if cr5_input.strip():
+        result, err = analyze_cr5(cr5_input.strip())
+        if err:
+            st.error(f"⚠️ {err}")
+        else:
+            if result["glow"]:
+                st.success("✨ **Glow: ON**")
+            else:
+                st.info("🔘 **Glow: Off**")
+
+            st.markdown("**CR5 stat contributions (recessive positions):**")
+            if result["expressing"]:
+                for coord, stat_name, stat_val in sorted(result["expressing"]):
+                    st.markdown(f"  `{coord}` → +{stat_val} {stat_name}")
+                st.markdown("**Totals from CR5:**")
+                for stat, total in sorted(result["stat_totals"].items()):
+                    st.markdown(f"  🟢 {stat}: +{total}")
+            else:
+                st.markdown("  No stat genes expressing on CR5.")
+
+            if result["not_expressing"]:
+                with st.expander("Stat genes not expressing (dominant)"):
+                    for coord, stat_name, stat_val in sorted(result["not_expressing"]):
+                        st.markdown(f"  `{coord}` → {stat_val} {stat_name} (off)")
+
+with col_cr9:
+    st.subheader("CR9 — Particles & Tail Light (20 positions)")
+    cr9_input = st.text_input(
+        "CR9 genome string",
+        placeholder="e.g. XXXo Xooo XX oo Xooo oXoo",
+        key="cr9_input"
+    )
+    if cr9_input.strip():
+        result, err = lookup_cr9(cr9_input.strip())
+        if err:
+            st.error(f"⚠️ {err}")
+        else:
+            p = result["particle"]
+            tl = result["taillight"]
+            ambiguous = result["taillight_ambiguous"]
+
+            p_icon = {"Tail": "🐝", "Wing": "🪽", "None": "⬜", "Unknown": "❓"}.get(p, "❓")
+            st.markdown(f"**Particles:** {p_icon} {p}")
+
+            if tl == ["Unknown"]:
+                st.markdown("**Tail light:** ❓ Unknown")
+                st.caption("This pattern isn't in the research data yet. If you know what tail light color this bee has, please share the genome with Kaskrim at twitch.tv/kaskrim.")
+            elif ambiguous:
+                colors_str = " or ".join(tl)
+                st.warning(f"**Tail light:** ⚠️ {colors_str}")
+                st.caption(
+                    f"This genome pattern matches multiple tail light colors in the research data "
+                    f"({colors_str}). The decode for this pattern is not yet confirmed. "
+                    f"If you can confirm which color your bee actually has, please share it with "
+                    f"Kaskrim at twitch.tv/kaskrim — it will help resolve the ambiguity."
+                )
+            else:
+                st.markdown(f"**Tail light:** 💡 {tl[0]}")
+
+            if p == "Unknown":
+                st.caption("Particle result unknown — pattern not in research data. Share with Kaskrim at twitch.tv/kaskrim.")
+
+st.divider()
+st.markdown("""
+<small>
+Glow and particle data: Kaskrim, 2026. Tail light series data: community research.
+Lookup tables are incomplete — Unknown = not yet documented, not necessarily absent.
 </small>
 """, unsafe_allow_html=True)
 
