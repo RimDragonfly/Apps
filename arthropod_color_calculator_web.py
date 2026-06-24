@@ -235,6 +235,40 @@ def calculate_changes(positions, cr, target_color):
 # STREAMLIT UI
 # ============================================================
 
+def show_cr9_path(path, label):
+    """Display a CR9 flip path with stat notes in Streamlit."""
+    if path is None or not path["flips"]:
+        return
+    flips = path["flips"]
+    net_total = path["net_total"]
+    net_stat = path["net_stat"]
+    if net_total > 0:
+        summary = f"{len(flips)} flip(s) — 🟢 net +{net_total} stat points"
+    elif net_total < 0:
+        summary = f"{len(flips)} flip(s) — 🔴 net {net_total} stat points"
+    else:
+        summary = f"{len(flips)} flip(s) — no net stat change"
+    st.markdown(f"**{label}:** {summary}")
+    st.caption(f"Target pattern: `{path['target']}`")
+    for f in flips:
+        coord = f["coord"]
+        direction = f["direction"]
+        stat_info = STAT_GENES_CR9.get(coord)
+        if stat_info and stat_info[1] > 0:
+            stat_name, stat_val = stat_info
+            delta = stat_val if "dominant → recessive" in direction else -stat_val
+            sign = "+" if delta > 0 else ""
+            icon = "🟢" if delta > 0 else "🔴"
+            st.markdown(f"  `{coord}` {direction} → {icon} {sign}{delta} {stat_name}")
+        else:
+            st.markdown(f"  `{coord}` {direction} → cosmetic")
+    if net_stat:
+        for stat, delta in sorted(net_stat.items()):
+            sign = "+" if delta > 0 else ""
+            icon = "🟢" if delta > 0 else "🔴"
+            st.markdown(f"  {icon} **{stat}:** {sign}{delta}")
+
+
 st.set_page_config(
     page_title="Arthropod Color Calculator",
     page_icon="🐝",
@@ -409,6 +443,24 @@ STAT_GENES_CR5 = {
     "5B4": ("Ferocity",     1),
     "5C2": ("Toughness",    7),
 }
+
+# CR9 stat gene map (positions A1-E4, 20 positions)
+# Source: arthropod-stat-genome-v2.txt
+STAT_GENES_CR9 = {
+    "9A1": ("Toughness",     2),
+    "9A3": ("Virility",      4),
+    "9A4": ("Toughness",     2),
+    "9B2": ("Ferocity",      4),
+    "9B3": ("Ferocity",      1),
+    "9B4": ("Enthusiasm",    4),
+    "9C2": ("Friendliness",  7),
+    "9D1": ("Friendliness",  2),
+    "9D2": ("Ruggedness",    4),
+    "9D4": ("Enthusiasm",    3),
+    "9E1": ("Intelligence",  5),
+    "9E4": ("Virility",      5),
+}
+# A2, B1, C1, C3, C4, D3, E2, E3 are cosmetic (_)
 
 # CR5 glow-on patterns (normalized, 10 chars)
 # Anything not in this set = glow off
@@ -618,32 +670,80 @@ def lookup_cr9(raw):
     return {"particle": particle, "taillight": taillight, "taillight_ambiguous": ambiguous}, None
 
 
+def _calc_flip_stats(flips, stat_genes):
+    """Calculate net stat change for a list of flips.
+    recessive→dominant = stat OFF = negative delta
+    dominant→recessive = stat ON = positive delta
+    """
+    net = {}
+    for f in flips:
+        coord = f["coord"]
+        if coord in stat_genes:
+            stat_name, stat_val = stat_genes[coord]
+            if stat_val > 0:
+                delta = stat_val if "dominant → recessive" in f["direction"] else -stat_val
+                net[stat_name] = net.get(stat_name, 0) + delta
+    return net
+
+
+def _score_path(path):
+    """Returns (flips_count, -net_total) for sorting: fewer flips first, then best stat."""
+    net_total = sum(path["net_stat"].values())
+    return (path["flips_count"], -net_total)
+
+
+def _build_paths(current_key, target_patterns, coords, stat_genes):
+    """Build all paths from current_key to each target pattern, return (fastest, best_stat)."""
+    all_paths = []
+    for target_pattern in target_patterns:
+        if len(target_pattern) != len(current_key):
+            continue
+        flips = []
+        for i, (c, t) in enumerate(zip(current_key, target_pattern)):
+            if c != t:
+                direction = "recessive → dominant" if t == "X" else "dominant → recessive"
+                flips.append({"coord": coords[i], "direction": direction})
+        net_stat = _calc_flip_stats(flips, stat_genes)
+        net_total = sum(net_stat.values())
+        all_paths.append({
+            "target": target_pattern,
+            "flips_count": len(flips),
+            "flips": flips,
+            "net_stat": net_stat,
+            "net_total": net_total,
+        })
+    if not all_paths:
+        return None, None
+    fastest = min(all_paths, key=lambda p: (p["flips_count"], -p["net_total"]))
+    best_stat = min(all_paths, key=lambda p: (-p["net_total"], p["flips_count"]))
+    return fastest, best_stat
+
+
 def particle_paths(particle_key):
-    """For each known particle type (Tail, Wing, None), find the cheapest path
-    from the current particle_key pattern. Returns dict keyed by type."""
-    # Group all known patterns by type
+    """For each known particle type, return (fastest, best_stat) path dicts."""
     by_type = {"Tail": [], "Wing": [], "None": []}
     for pattern, ptype in PARTICLE_LOOKUP.items():
         if ptype in by_type:
             by_type[ptype].append(pattern)
-
-    # Also include no-particle heuristic: if none in lookup, treat any non-Tail/Wing as None
-    # (We only compute paths to patterns we actually know)
-
+    coords = ["9A1","9A2","9A3","9A4","9B1","9B2","9B3","9B4","9C1","9C2"]
     results = {}
     for target_type, patterns in by_type.items():
-        best = None
-        for target_pattern in patterns:
-            flips = []
-            for i, (c, t) in enumerate(zip(particle_key, target_pattern)):
-                if c != t:
-                    coord = ["9A1","9A2","9A3","9A4","9B1","9B2","9B3","9B4","9C1","9C2"][i]
-                    direction = "recessive → dominant" if t == "X" else "dominant → recessive"
-                    flips.append({"coord": coord, "direction": direction})
-            path = {"target": target_pattern, "flips_count": len(flips), "flips": flips}
-            if best is None or len(flips) < best["flips_count"]:
-                best = path
-        results[target_type] = best
+        fastest, best_stat = _build_paths(particle_key, patterns, coords, STAT_GENES_CR9)
+        results[target_type] = {"fastest": fastest, "best_stat": best_stat}
+    return results
+
+
+def taillight_paths(taillight_key):
+    """For each known tail light color, return (fastest, best_stat) path dicts."""
+    by_color = {}
+    for pattern, colors in TAILLIGHT_LOOKUP.items():
+        for color in colors:
+            by_color.setdefault(color, []).append(pattern)
+    coords = ["9C3","9C4","9D1","9D2","9D3","9D4","9E1","9E2","9E3","9E4"]
+    results = {}
+    for target_color, patterns in by_color.items():
+        fastest, best_stat = _build_paths(taillight_key, patterns, coords, STAT_GENES_CR9)
+        results[target_color] = {"fastest": fastest, "best_stat": best_stat}
     return results
 
 
@@ -693,8 +793,59 @@ with col_cr5:
                     for coord, stat_name, stat_val in sorted(result["not_expressing"]):
                         st.markdown(f"  `{coord}` → {stat_val} {stat_name} (off)")
 
-            # ---- Glow-off: show paths to reach glow-on ----
-            if not result["glow"]:
+            # ---- Glow: show paths or better-stat alternatives ----
+            if result["glow"]:
+                # Already glowing — check if a better-stat glow-on pattern exists
+                st.divider()
+                st.markdown("**Optimize glow stats:**")
+                current_norm = result["norm"]
+                coords = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
+                better_paths = []
+                current_net = sum(
+                    (STAT_GENES_CR5[f"5{l}{p}"][1] if f"5{l}{p}" in STAT_GENES_CR5 and current_norm[i] == "o" else 0)
+                    for i, (l, sz) in enumerate([(l, sz) for l, sz in [("A",4),("B",4),("C",2)] for _ in range(sz)])
+                    for p in [1]
+                )
+                # Simpler: compare current stat total vs each other glow-on pattern
+                current_stat_total = sum(
+                    STAT_GENES_CR5[coord][1]
+                    for i, coord in enumerate(coords)
+                    if current_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
+                )
+                for target_norm in GLOW_ON_PATTERNS:
+                    if target_norm == current_norm:
+                        continue
+                    target_stat_total = sum(
+                        STAT_GENES_CR5[coord][1]
+                        for i, coord in enumerate(coords)
+                        if target_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
+                    )
+                    if target_stat_total > current_stat_total:
+                        flips = []
+                        net_stat = {}
+                        for i, coord in enumerate(coords):
+                            c, t = current_norm[i], target_norm[i]
+                            if c != t:
+                                direction = "recessive → dominant" if t == "X" else "dominant → recessive"
+                                stat_info = STAT_GENES_CR5.get(coord)
+                                if stat_info and stat_info[1] > 0:
+                                    delta = stat_info[1] if "dominant → recessive" in direction else -stat_info[1]
+                                    net_stat[stat_info[0]] = net_stat.get(stat_info[0], 0) + delta
+                                flips.append({"coord": coord, "direction": direction, "stat": stat_info})
+                        better_paths.append({
+                            "target": target_norm,
+                            "flips": flips,
+                            "flips_count": len(flips),
+                            "net_stat": net_stat,
+                            "net_total": sum(net_stat.values()),
+                        })
+                if better_paths:
+                    best = max(better_paths, key=lambda p: p["net_total"])
+                    st.markdown(f"A better-stat glow-on pattern exists (+{best['net_total']} net stats):")
+                    show_glow_path(best, "Better stat option")
+                else:
+                    st.success("Current glow pattern already has the best stats among known glow-on patterns.")
+            elif not result["glow"]:
                 st.divider()
                 st.markdown("**Paths to turn glow on:**")
                 paths_speed, paths_stat = glow_on_paths(result["positions"], result["norm"])
@@ -807,21 +958,72 @@ with col_cr9:
             if norm_full:
                 particle_key = norm_full[:10]
                 if target_particle == p:
-                    st.success(f"Already {target_particle} particles — no flips needed.")
+                    # Same type — check if a better-stat pattern exists within this type
+                    paths = particle_paths(particle_key)
+                    p_result = paths.get(target_particle)
+                    best_stat = p_result["best_stat"] if p_result else None
+                    if best_stat and best_stat["flips_count"] > 0 and best_stat["net_total"] > 0:
+                        st.success(f"Already {target_particle} particles.")
+                        st.markdown("📈 **A better-stat pattern exists for this type:**")
+                        show_cr9_path(best_stat, "Better stat option")
+                    elif best_stat and best_stat["flips_count"] > 0 and best_stat["net_total"] == 0:
+                        st.success(f"Already {target_particle} particles — current pattern has optimal stats for this type.")
+                    else:
+                        st.success(f"Already {target_particle} particles — current pattern has optimal stats for this type.")
                 else:
                     paths = particle_paths(particle_key)
-                    best = paths.get(target_particle)
-                    if best is None or not best["flips"]:
+                    p_result = paths.get(target_particle)
+                    fastest = p_result["fastest"] if p_result else None
+                    best_stat = p_result["best_stat"] if p_result else None
+                    if fastest is None:
                         if target_particle == "None":
                             st.info("No-particle states are achievable but the research data in this app doesn't yet include documented patterns to aim for. Check back as more data is added.")
                         else:
                             st.info("No known pattern available for this particle type.")
                     else:
-                        flips = best["flips"]
-                        st.markdown(f"**Fewest flips to {target_particle}:** {len(flips)} flip(s)")
-                        st.caption(f"Target pattern: `{best['target']}`")
-                        for f in flips:
-                            st.markdown(f"  `{f['coord']}` — {f['direction']}")
+                        st.markdown("##### ⚡ Fewest flips")
+                        show_cr9_path(fastest, "Fastest path")
+                        if best_stat and best_stat["target"] != fastest["target"]:
+                            st.markdown("##### 📈 Best stat outcome")
+                            show_cr9_path(best_stat, "Best stat path")
+                        else:
+                            st.caption("The fastest path is also the best stat outcome.")
+
+            # ---- Tail light color target dropdown ----
+            st.divider()
+            st.markdown("**Change tail light color:**")
+            norm_full2, _ = normalize_genome_str(cr9_input.strip(), 20)
+            if norm_full2:
+                taillight_key = norm_full2[10:]
+                # Build color options from lookup
+                all_colors = sorted(set(
+                    color for colors in TAILLIGHT_LOOKUP.values() for color in colors
+                ))
+                current_tl = tl[0] if tl and tl != ["Unknown"] and not ambiguous else None
+                default_tl_idx = all_colors.index(current_tl) if current_tl in all_colors else 0
+                target_tl = st.selectbox(
+                    "Target tail light color",
+                    options=all_colors,
+                    index=default_tl_idx,
+                    key="target_taillight"
+                )
+                if current_tl and target_tl == current_tl:
+                    st.success(f"Already {target_tl} — no flips needed.")
+                else:
+                    tl_paths = taillight_paths(taillight_key)
+                    tl_result = tl_paths.get(target_tl)
+                    tl_fastest = tl_result["fastest"] if tl_result else None
+                    tl_best_stat = tl_result["best_stat"] if tl_result else None
+                    if tl_fastest is None:
+                        st.info(f"No known pattern for {target_tl} in research data.")
+                    else:
+                        st.markdown("##### ⚡ Fewest flips")
+                        show_cr9_path(tl_fastest, "Fastest path")
+                        if tl_best_stat and tl_best_stat["target"] != tl_fastest["target"]:
+                            st.markdown("##### 📈 Best stat outcome")
+                            show_cr9_path(tl_best_stat, "Best stat path")
+                        else:
+                            st.caption("The fastest path is also the best stat outcome.")
 
 st.divider()
 st.markdown("""
