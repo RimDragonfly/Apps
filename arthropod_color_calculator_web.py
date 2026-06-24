@@ -686,10 +686,6 @@ def _calc_flip_stats(flips, stat_genes):
     return net
 
 
-def _score_path(path):
-    """Returns (flips_count, -net_total) for sorting: fewer flips first, then best stat."""
-    net_total = sum(path["net_stat"].values())
-    return (path["flips_count"], -net_total)
 
 
 def _build_paths(current_key, target_patterns, coords, stat_genes):
@@ -801,12 +797,6 @@ with col_cr5:
                 current_norm = result["norm"]
                 coords = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
                 better_paths = []
-                current_net = sum(
-                    (STAT_GENES_CR5[f"5{l}{p}"][1] if f"5{l}{p}" in STAT_GENES_CR5 and current_norm[i] == "o" else 0)
-                    for i, (l, sz) in enumerate([(l, sz) for l, sz in [("A",4),("B",4),("C",2)] for _ in range(sz)])
-                    for p in [1]
-                )
-                # Simpler: compare current stat total vs each other glow-on pattern
                 current_stat_total = sum(
                     STAT_GENES_CR5[coord][1]
                     for i, coord in enumerate(coords)
@@ -839,10 +829,19 @@ with col_cr5:
                             "net_stat": net_stat,
                             "net_total": sum(net_stat.values()),
                         })
+                WORST_GLOW_PATTERN = "oooooXXXXo"  # loses both Ferocity and Friendliness
+                is_worst = current_norm == WORST_GLOW_PATTERN
+
                 if better_paths:
+                    if is_worst:
+                        st.warning("⚠️ Your current glow pattern has the lowest stat value of all known glow-on patterns — it costs both Ferocity and Friendliness. All other glow-on patterns are better.")
                     best = max(better_paths, key=lambda p: p["net_total"])
                     st.markdown(f"A better-stat glow-on pattern exists (+{best['net_total']} net stats):")
                     show_glow_path(best, "Better stat option")
+                    if len(better_paths) > 1:
+                        with st.expander(f"Other better options ({len(better_paths) - 1} more)"):
+                            for p in sorted(better_paths, key=lambda p: -p["net_total"])[1:]:
+                                show_glow_path(p, f"Alternative ({p['flips_count']} flip(s))")
                 else:
                     st.success("Current glow pattern already has the best stats among known glow-on patterns.")
             elif not result["glow"]:
@@ -883,33 +882,36 @@ with col_cr5:
                             icon = "🟢" if delta > 0 else "🔴"
                             st.markdown(f"  {icon} **{stat}:** {sign}{delta}")
 
-                # Show shortest path first
-                fastest = paths_speed[0]
-                min_flips = fastest["flips_count"]
+                # Three fixed sections:
+                # 1. Shortest path to any glow-on
+                # 2. Path to -1 Ferocity pattern
+                # 3. Path to -3 Friendliness pattern
+                FEROCITY_PATTERN    = "oooooXoXoo"
+                FRIENDLINESS_PATTERN = "oooooXXoXo"
 
-                st.markdown("##### ⚡ Shortest path")
+                fastest = paths_speed[0]
+                st.markdown("##### ⚡ Shortest path to glow")
                 show_glow_path(fastest, "Shortest path")
 
-                # Show all alternatives that are NOT the shortest path
-                # but have a better stat outcome than the shortest
-                # Exclude any path that loses BOTH Ferocity AND Friendliness
-                # unless it is the only shortest path
-                def loses_both(path):
-                    net = path["net_stat"]
-                    return net.get("Ferocity", 0) < 0 and net.get("Friendliness", 0) < 0
+                # Path to -1 Ferocity pattern
+                fe_path = next((p for p in paths_speed if p["target"] == FEROCITY_PATTERN), None)
+                st.markdown("##### Path to −1 Ferocity glow")
+                if fe_path and fe_path["flips_count"] == 0:
+                    st.success("Already on this pattern.")
+                elif fe_path:
+                    show_glow_path(fe_path, f"{fe_path['flips_count']} flip(s)")
+                else:
+                    st.info("No path available.")
 
-                alternatives = [
-                    p for p in paths_speed
-                    if p["target"] != fastest["target"]
-                    and not (loses_both(p) and not loses_both(fastest))
-                ]
-
-                if alternatives:
-                    st.markdown("##### 🔀 Alternatives (more flips, better stats)")
-                    for p in alternatives:
-                        show_glow_path(p, f"Alternative ({p['flips_count']} flip(s))")
-                elif not loses_both(fastest):
-                    st.caption("No better-stat alternatives available.")
+                # Path to -3 Friendliness pattern
+                fr_path = next((p for p in paths_speed if p["target"] == FRIENDLINESS_PATTERN), None)
+                st.markdown("##### Path to −3 Friendliness glow")
+                if fr_path and fr_path["flips_count"] == 0:
+                    st.success("Already on this pattern.")
+                elif fr_path:
+                    show_glow_path(fr_path, f"{fr_path['flips_count']} flip(s)")
+                else:
+                    st.info("No path available.")
 
 with col_cr9:
     st.subheader("CR9 — Particles & Tail Light (20 positions)")

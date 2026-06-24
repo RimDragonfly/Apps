@@ -219,7 +219,6 @@ def calculate_changes(positions, chromosome, target_color):
         print("A-E dominant or mixed may still need adjustment for exact shade.")
         return
 
-    changes_needed = []
     total_stat_cost = {}
 
     if current_fj < target_lo:
@@ -546,9 +545,11 @@ def lookup_cr9(raw):
     tl_results = TAILLIGHT_LOOKUP.get(taillight_key, None)
     if tl_results is None:
         taillight = ["Unknown"]
+        ambiguous = False
     else:
         taillight = tl_results
-    return {"particle": particle, "taillight": taillight}, None
+        ambiguous = len(tl_results) > 1
+    return {"particle": particle, "taillight": taillight, "taillight_ambiguous": ambiguous}, None
 
 
 def _calc_flip_stats(flips, stat_genes):
@@ -660,28 +661,36 @@ def visual_traits_menu():
                                 stat_info = STAT_GENES_CR5.get(coord)
                                 if stat_info and stat_info[1] > 0:
                                     delta = stat_info[1] if "dominant → recessive" in direction else -stat_info[1]
-                                    net_stat[stat_info[0]] = net_stat.get(net_stat, 0) + delta
+                                    net_stat[stat_info[0]] = net_stat.get(stat_info[0], 0) + delta
                                 flips.append({"coord": coord, "direction": direction, "stat": stat_info})
                         net_total = sum(net_stat.values())
                         better_paths.append({"target": target_norm, "flips": flips,
                                              "flips_count": len(flips), "net_stat": net_stat, "net_total": net_total})
-                if better_paths:
-                    best = max(better_paths, key=lambda p_: p_["net_total"])
-                    print(f"Better-stat glow pattern available (+{best['net_total']} net stats):")
-                    def print_glow_path(path):
-                        print(f"  Target: {path['target']} ({path['flips_count']} flip(s))")
-                        for f in path["flips"]:
-                            stat_info = f["stat"]
-                            if stat_info and stat_info[1] > 0:
-                                delta = stat_info[1] if "dominant → recessive" in f["direction"] else -stat_info[1]
-                                sign = "+" if delta > 0 else ""
-                                print(f"    {f['coord']}: {f['direction']} -> {sign}{delta} {stat_info[0]}")
-                            else:
-                                print(f"    {f['coord']}: {f['direction']} -> cosmetic")
-                        for stat, delta in sorted(path["net_stat"].items()):
+                WORST_GLOW_PATTERN = "oooooXXXXo"
+                is_worst = current_norm == WORST_GLOW_PATTERN
+
+                def print_glow_path(path):
+                    print(f"  Target: {path['target']} ({path['flips_count']} flip(s))")
+                    for f in path["flips"]:
+                        stat_info = f["stat"]
+                        if stat_info and stat_info[1] > 0:
+                            delta = stat_info[1] if "dominant → recessive" in f["direction"] else -stat_info[1]
                             sign = "+" if delta > 0 else ""
-                            print(f"    Total {stat}: {sign}{delta}")
-                    print_glow_path(best)
+                            print(f"    {f['coord']}: {f['direction']} -> {sign}{delta} {stat_info[0]}")
+                        else:
+                            print(f"    {f['coord']}: {f['direction']} -> cosmetic")
+                    for stat, delta in sorted(path["net_stat"].items()):
+                        sign = "+" if delta > 0 else ""
+                        print(f"    Total {stat}: {sign}{delta}")
+
+                if better_paths:
+                    if is_worst:
+                        print("WARNING: Your current glow pattern has the lowest stat value of all known")
+                        print("glow-on patterns — it costs both Ferocity and Friendliness.")
+                        print("All other glow-on patterns are better.")
+                    print(f"Better-stat glow options ({len(better_paths)}):")
+                    for p in sorted(better_paths, key=lambda p_: -p_["net_total"]):
+                        print_glow_path(p)
                 else:
                     print("Current glow pattern already has optimal stats among known glow-on patterns.")
             print()
@@ -729,27 +738,33 @@ def visual_traits_menu():
 
                 fastest = by_speed[0]
                 best = by_stat[0]
-                def loses_both(path):
-                    net = path["net_stat"]
-                    return net.get("Ferocity", 0) < 0 and net.get("Friendliness", 0) < 0
+                FEROCITY_PATTERN     = "oooooXoXoo"
+                FRIENDLINESS_PATTERN = "oooooXXoXo"
 
                 fastest = by_speed[0]
                 print()
-                print("  --- Shortest path ---")
+                print("  --- Shortest path to glow ---")
                 print_path(fastest, "Shortest")
 
-                alternatives = [
-                    p for p in by_speed
-                    if p["target"] != fastest["target"]
-                    and not (loses_both(p) and not loses_both(fastest))
-                ]
-                if alternatives:
-                    print()
-                    print("  --- Alternatives (more flips, better stats) ---")
-                    for p in alternatives:
-                        print_path(p, f"Alternative ({p['flips_count']} flip(s))")
-                elif not loses_both(fastest):
-                    print("  (No better-stat alternatives available)")
+                fe_path = next((p for p in by_speed if p["target"] == FEROCITY_PATTERN), None)
+                print()
+                print("  --- Path to -1 Ferocity glow ---")
+                if fe_path and fe_path["flips_count"] == 0:
+                    print("  Already on this pattern.")
+                elif fe_path:
+                    print_path(fe_path, f"{fe_path['flips_count']} flip(s)")
+                else:
+                    print("  No path available.")
+
+                fr_path = next((p for p in by_speed if p["target"] == FRIENDLINESS_PATTERN), None)
+                print()
+                print("  --- Path to -3 Friendliness glow ---")
+                if fr_path and fr_path["flips_count"] == 0:
+                    print("  Already on this pattern.")
+                elif fr_path:
+                    print_path(fr_path, f"{fr_path['flips_count']} flip(s)")
+                else:
+                    print("  No path available.")
 
     print()
     print("-" * 55)
