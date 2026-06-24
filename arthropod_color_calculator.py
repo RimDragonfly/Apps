@@ -413,36 +413,46 @@ PARTICLE_LOOKUP = {
 
 TAILLIGHT_LOOKUP = {
     "oXXooXooXo": ["Wave Teal"],
-    "oXXXoooXoo": ["Poison Green"],
-    "ooooXoXooo": ["Poison Green"],
-    "ooXXXooXoo": ["Poison Green"],
-    "ooooXXoXoX": ["Golden Yellow"],
-    "ooooXoXXoX": ["Golden Yellow"],
-    "ooooXoXoXX": ["Golden Yellow"],
-    "ooooXooXoX": ["Golden Yellow", "Firey Pink"],
-    "oXoXooXooX": ["Aqua Blue"],
-    "ooooXooooX": ["Aqua Blue", "None"],
-    "oXooooXoXX": ["Aqua Blue"],
-    "oXooooooXX": ["Red Orange"],
-    "oXoXoXXXXX": ["Red Orange"],
-    "oXXoXoXXoX": ["Firey Pink"],
-    "oXoXoXXXXo": ["Firey Pink"],
-    "oXoXoXXXoX": ["Firey Pink"],
-    "ooooXoooXX": ["Firey Pink", "None"],
-    "oXoXXXXooX": ["Galaxy Purple"],
-    "oXoXXooooo": ["Galaxy Purple"],
-    "ooooXoXXXX": ["Galaxy Purple", "White Frosty"],
-    "ooooXoXXoX": ["Galaxy Purple"],
-    "ooooXooXXX": ["Galaxy Purple"],
-    "ooooooooXX": ["Galaxy Purple"],
-    "ooooXooooo": ["White/Purp/Teal"],
-    "XXooooXooX": ["White/Purp/Teal"],
-    "oXooXooXoo": ["White/Purp/Teal"],
-    "ooooXXoooX": ["White Noise"],
-    "ooooXoXooX": ["White Noise"],
-    "oXooooooXo": ["None"],
-    "oXooooXoXo": ["None"],
-    "oXooXooXXo": ["None"],
+    "oXXooooXoo": ["Poison Green"],
+    "XXoooXoooo": ["Poison Green"],
+    "ooXoXooooo": ["Poison Green"],
+    "ooXXoXoXoo": ["Golden Yellow"],
+    "ooXoXXoXoo": ["Golden Yellow"],
+    "ooXoXoXXoo": ["Golden Yellow"],
+    "ooXooXooXo": ["Golden Yellow"],
+    "oXoooooXXo": ["Aqua Blue"],
+    "XoXooXoXoo": ["Aqua Blue"],
+    "ooXooooXoo": ["Aqua Blue"],
+    "XoooXooXXX": ["Aqua Blue"],
+    "oooXXooXoo": ["Aqua Blue"],
+    "oXooooXXXX": ["Red Orange"],
+    "XoXoXXXXXX": ["Red Orange"],
+    "oXXoXXXXoX": ["Firey Pink"],
+    "XoXoXXXXXo": ["Firey Pink"],
+    "XoXoXXXXoX": ["Firey Pink"],
+    "ooXoooXXoo": ["Firey Pink"],
+    "ooXooXoXoo": ["Firey Pink"],
+    "XoXXXooXoo": ["Galaxy Purple"],
+    "XoXoooooXo": ["Galaxy Purple"],
+    "XoXooooooo": ["Galaxy Purple"],
+    "ooXoXXXXXo": ["Galaxy Purple"],
+    "ooXoXXXXoX": ["Galaxy Purple"],
+    "ooXooXXXoo": ["Galaxy Purple"],
+    "ooooooXXXo": ["Galaxy Purple"],
+    "oXooooooXo": ["White/Purp/Teal"],
+    "ooXooooooo": ["White/Purp/Teal"],
+    "XXoooXooXo": ["White/Purp/Teal"],
+    "XoXooXoooo": ["White/Purp/Teal"],
+    "ooXoXXXXoo": ["White Frosty"],
+    "ooXXoooXoo": ["White Noise"],
+    "ooXoXooXoo": ["White Noise"],
+    "ooXooooooX": ["White Noise"],
+    "ooooooooXo": ["none"],
+    "oXoooooXXX": ["none"],
+    "oXooooXoXo": ["none"],
+    "XoXooXoXXo": ["none"],
+    "ooXooooXXo": ["none"],
+    "ooXooooXoX": ["none"],
 }
 
 
@@ -664,7 +674,10 @@ def visual_traits_menu():
                         paths = particle_paths(particle_key)
                         best = paths.get(target_p)
                         if best is None or not best["flips"]:
-                            print(f"No known pattern for {target_p} in research data.")
+                            if target_p == "None":
+                                print("No-particle states are achievable but the research data in this app doesn't yet include documented patterns to aim for.")
+                            else:
+                                print(f"No known pattern for {target_p} in research data.")
                         else:
                             print(f"Fewest flips to {target_p}: {best['flips_count']} flip(s)")
                             print(f"  Target pattern: {best['target']}")

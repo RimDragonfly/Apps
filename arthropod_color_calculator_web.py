@@ -448,46 +448,49 @@ PARTICLE_LOOKUP = {
 # Key: 10-char normalized string
 # Value: color name string
 # Tail light lookup: key -> list of possible colors
-# Entries with multiple colors mean the pattern is ambiguous — needs more data
+# Source: Kaskrim raw data, correctly parsed
 TAILLIGHT_LOOKUP = {
     "oXXooXooXo": ["Wave Teal"],
-    "oXXoXoooоX": ["Wave Teal"],
-    "oXXXoooXoo": ["Poison Green"],
-    "ooooXoXooo": ["Poison Green"],
-    "ooXXXooXoo": ["Poison Green"],
-    "ooooXXoXoX": ["Golden Yellow"],
-    "ooooXoXXoX": ["Golden Yellow"],
-    "ooooXoXoXX": ["Golden Yellow"],
-    "ooooXooXoX": ["Golden Yellow", "Firey Pink"],  # ambiguous — needs more data
-    "oXooooooоX": ["Aqua Blue"],
-    "oXoXooXooX": ["Aqua Blue"],
-    "ooooXooooX": ["Aqua Blue", "None"],            # ambiguous — needs more data
-    "oXooooXoXX": ["Aqua Blue"],
-    "ooooоXXooX": ["Aqua Blue"],
-    "oXooooooXX": ["Red Orange"],
-    "oXoXoXXXXX": ["Red Orange"],
-    "oXXoXoXXoX": ["Firey Pink"],
-    "oXoXoXXXXo": ["Firey Pink"],
-    "oXoXoXXXoX": ["Firey Pink"],
-    "ooooXoooXX": ["Firey Pink", "None"],           # ambiguous — needs more data
-    "oXoXXXXooX": ["Galaxy Purple"],
-    "oXoXXoooоX": ["Galaxy Purple"],
-    "oXoXXooooo": ["Galaxy Purple"],
-    "ooooXoXXXX": ["Galaxy Purple", "White Frosty"], # ambiguous — needs more data
-    "ooooXoXXoX": ["Galaxy Purple"],
-    "ooooXooXXX": ["Galaxy Purple"],
-    "ooooooooXX": ["Galaxy Purple"],
-    "oXooooooоX": ["White/Purp/Teal"],
-    "ooooXooooo": ["White/Purp/Teal"],
-    "XXooooXooX": ["White/Purp/Teal"],
-    "oXooXooXoo": ["White/Purp/Teal"],
-    "ooooXXoooX": ["White Noise"],
-    "ooooXoXooX": ["White Noise"],
-    "ooooXoooоX": ["White Noise"],
-    "ooooooooоX": ["None"],
-    "oXooooooXo": ["None"],
-    "oXooooXoXo": ["None"],
-    "oXooXooXXo": ["None"],
+    "oXXooooXoo": ["Poison Green"],
+    "XXoooXoooo": ["Poison Green"],
+    "ooXoXooooo": ["Poison Green"],
+    "ooXXoXoXoo": ["Golden Yellow"],
+    "ooXoXXoXoo": ["Golden Yellow"],
+    "ooXoXoXXoo": ["Golden Yellow"],
+    "ooXooXooXo": ["Golden Yellow"],
+    "oXoooooXXo": ["Aqua Blue"],
+    "XoXooXoXoo": ["Aqua Blue"],
+    "ooXooooXoo": ["Aqua Blue"],
+    "XoooXooXXX": ["Aqua Blue"],
+    "oooXXooXoo": ["Aqua Blue"],
+    "oXooooXXXX": ["Red Orange"],
+    "XoXoXXXXXX": ["Red Orange"],
+    "oXXoXXXXoX": ["Firey Pink"],
+    "XoXoXXXXXo": ["Firey Pink"],
+    "XoXoXXXXoX": ["Firey Pink"],
+    "ooXoooXXoo": ["Firey Pink"],
+    "ooXooXoXoo": ["Firey Pink"],
+    "XoXXXooXoo": ["Galaxy Purple"],
+    "XoXoooooXo": ["Galaxy Purple"],
+    "XoXooooooo": ["Galaxy Purple"],
+    "ooXoXXXXXo": ["Galaxy Purple"],
+    "ooXoXXXXoX": ["Galaxy Purple"],
+    "ooXooXXXoo": ["Galaxy Purple"],
+    "ooooooXXXo": ["Galaxy Purple"],
+    "oXooooooXo": ["White/Purp/Teal"],
+    "ooXooooooo": ["White/Purp/Teal"],
+    "XXoooXooXo": ["White/Purp/Teal"],
+    "XoXooXoooo": ["White/Purp/Teal"],
+    "ooXoXXXXoo": ["White Frosty"],
+    "ooXXoooXoo": ["White Noise"],
+    "ooXoXooXoo": ["White Noise"],
+    "ooXooooooX": ["White Noise"],
+    "ooooooooXo": ["none"],
+    "oXoooooXXX": ["none"],
+    "oXooooXoXo": ["none"],
+    "XoXooXoXXo": ["none"],
+    "ooXooooXXo": ["none"],
+    "ooXooooXoX": ["none"],
 }
 
 def normalize_genome_str(raw, expected_len):
@@ -809,7 +812,10 @@ with col_cr9:
                     paths = particle_paths(particle_key)
                     best = paths.get(target_particle)
                     if best is None or not best["flips"]:
-                        st.info("No known pattern available for this particle type.")
+                        if target_particle == "None":
+                            st.info("No-particle states are achievable but the research data in this app doesn't yet include documented patterns to aim for. Check back as more data is added.")
+                        else:
+                            st.info("No known pattern available for this particle type.")
                     else:
                         flips = best["flips"]
                         st.markdown(f"**Fewest flips to {target_particle}:** {len(flips)} flip(s)")
