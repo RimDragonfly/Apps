@@ -740,10 +740,10 @@ if any([cr1_data, cr3_data, cr5_data, cr9_data]):
             st.metric("Particles (CR9)", cr9_data["particle"])
             tl = cr9_data["taillight"]
             tl_label = " or ".join(tl) if cr9_data["taillight_ambiguous"] else (tl[0] if tl != ["Unknown"] else "Unknown")
-            st.metric("Tail light (CR9)", tl_label)
+            st.metric("Particle color (CR9)", tl_label)
         else:
             st.metric("Particles (CR9)", "—")
-            st.metric("Tail light (CR9)", "—")
+            st.metric("Particle color (CR9)", "—")
 
 # ── SECTION 3: Change Body Color (CR1) ───────────────────────────────────
 if cr1_data:
@@ -1051,7 +1051,7 @@ if cr5_data:
 # ── SECTION 6: Change Particles & Tail Light (CR9) ───────────────────────
 if cr9_data:
     st.divider()
-    st.header("🐝 Change Particles & Tail Light (CR9)")
+    st.header("🐝 Change Particle Color & Location (CR9)")
     norm_cr9, _ = normalize_genome_str(cr9_raw, 20)
 
     if norm_cr9:
@@ -1099,22 +1099,22 @@ if cr9_data:
                         st.info(f"No known pattern for {target_p} in research data.")
 
         with col_t:
-            st.subheader("Tail light color")
+            st.subheader("Particle color")
             tl = cr9_data["taillight"]
             ambiguous = cr9_data["taillight_ambiguous"]
             if tl == ["Unknown"]:
-                st.markdown("**Current:** ❓ Unknown")
+                st.markdown("**Current particle color:** ❓ Unknown")
                 st.caption("Pattern not in research data. Share with Kaskrim at twitch.tv/kaskrim.")
             elif ambiguous:
-                st.markdown(f"**Current:** ⚠️ {' or '.join(tl)} (ambiguous)")
+                st.markdown(f"**Current particle color:** ⚠️ {' or '.join(tl)} (ambiguous)")
                 st.caption(f"Needs more data. If you can confirm, share with Kaskrim at twitch.tv/kaskrim.")
             else:
-                st.markdown(f"**Current:** 💡 {tl[0]}")
+                st.markdown(f"**Current particle color:** 💡 {tl[0]}")
 
             all_colors = sorted(set(color for colors in TAILLIGHT_LOOKUP.values() for color in colors))
             current_tl = tl[0] if tl and tl != ["Unknown"] and not ambiguous else None
             default_idx = all_colors.index(current_tl) if current_tl in all_colors else 0
-            target_tl = st.selectbox("Target tail light color", options=all_colors, index=default_idx, key="target_taillight")
+            target_tl = st.selectbox("Target particle color", options=all_colors, index=default_idx, key="target_taillight")
 
             if current_tl and target_tl == current_tl:
                 st.success(f"Already {target_tl} — no flips needed.")
