@@ -962,6 +962,38 @@ with col_cr5:
                                 show_glow_path(p, f"Alternative ({p['flips_count']} flip(s))")
                 else:
                     st.success("Current glow pattern already has the best stats among known glow-on patterns.")
+
+                # ---- Glow off: most stats path ----
+                # Flip only stat-bearing dominant positions to recessive.
+                # Leave cosmetics alone. Verify result is not a glow-on pattern.
+                st.divider()
+                st.markdown("**Turn glow off (most stats):**")
+                coords5 = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
+                off_flips = []
+                off_net = {}
+                target_list = list(current_norm)
+                for i, coord in enumerate(coords5):
+                    if current_norm[i] == "X" and coord in STAT_GENES_CR5:
+                        target_list[i] = "o"
+                        stat_info = STAT_GENES_CR5[coord]
+                        if stat_info[1] > 0:
+                            off_net[stat_info[0]] = off_net.get(stat_info[0], 0) + stat_info[1]
+                        off_flips.append({"coord": coord, "direction": "dominant → recessive", "stat": stat_info})
+                off_target = "".join(target_list)
+                if off_target in GLOW_ON_PATTERNS:
+                    st.warning("⚠️ Flipping stat genes to recessive still results in a glow-on pattern — additional cosmetic flips may be needed. This is an unusual case.")
+                elif not off_flips:
+                    st.success("All stat genes already recessive — glow is already off at maximum stats.")
+                else:
+                    off_path = {
+                        "target": off_target,
+                        "flips": off_flips,
+                        "flips_count": len(off_flips),
+                        "net_stat": off_net,
+                        "net_total": sum(off_net.values()),
+                    }
+                    show_glow_path(off_path, f"Glow off — max stats ({len(off_flips)} flip(s))")
+
             elif not result["glow"]:
                 st.divider()
                 st.markdown("**Paths to turn glow on:**")

@@ -676,6 +676,33 @@ def taillight_paths(taillight_key):
     return results
 
 
+def show_glow_path_text(path, label):
+    """Print a CR5 glow flip path with stat notes (standalone version)."""
+    flips = path["flips"]
+    net = path["net_stat"]
+    net_total = path["net_total"]
+    if not flips:
+        print(f"  {label}: Already matches pattern — no flips needed.")
+        return
+    sign = f"+{net_total}" if net_total >= 0 else str(net_total)
+    print(f"  {label}: {path['flips_count']} flip(s), net stat {sign}")
+    print(f"    Target: {path['target']}")
+    for f in flips:
+        coord = f["coord"]
+        direction = f["direction"]
+        stat_info = f["stat"]
+        if stat_info and stat_info[1] > 0:
+            delta = stat_info[1] if "dominant → recessive" in direction else -stat_info[1]
+            sign2 = "+" if delta > 0 else ""
+            print(f"    {coord}: {direction} -> {sign2}{delta} {stat_info[0]}")
+        else:
+            print(f"    {coord}: {direction} -> cosmetic")
+    if net:
+        for stat, delta in sorted(net.items()):
+            sign2 = "+" if delta > 0 else ""
+            print(f"    Total {stat}: {sign2}{delta}")
+
+
 def visual_traits_menu(parsed_export=None):
     print()
     print("=" * 55)
@@ -733,20 +760,6 @@ def visual_traits_menu(parsed_export=None):
                 WORST_GLOW_PATTERN = "oooooXXXXo"
                 is_worst = current_norm == WORST_GLOW_PATTERN
 
-                def print_glow_path(path):
-                    print(f"  Target: {path['target']} ({path['flips_count']} flip(s))")
-                    for f in path["flips"]:
-                        stat_info = f["stat"]
-                        if stat_info and stat_info[1] > 0:
-                            delta = stat_info[1] if "dominant → recessive" in f["direction"] else -stat_info[1]
-                            sign = "+" if delta > 0 else ""
-                            print(f"    {f['coord']}: {f['direction']} -> {sign}{delta} {stat_info[0]}")
-                        else:
-                            print(f"    {f['coord']}: {f['direction']} -> cosmetic")
-                    for stat, delta in sorted(path["net_stat"].items()):
-                        sign = "+" if delta > 0 else ""
-                        print(f"    Total {stat}: {sign}{delta}")
-
                 if better_paths:
                     if is_worst:
                         print("WARNING: Your current glow pattern has the lowest stat value of all known")
@@ -754,9 +767,38 @@ def visual_traits_menu(parsed_export=None):
                         print("All other glow-on patterns are better.")
                     print(f"Better-stat glow options ({len(better_paths)}):")
                     for p in sorted(better_paths, key=lambda p_: -p_["net_total"]):
-                        print_glow_path(p)
+                        show_glow_path_text(p, f"Option ({p['flips_count']} flip(s))")
                 else:
                     print("Current glow pattern already has optimal stats among known glow-on patterns.")
+
+                # Glow off — most stats: flip only stat-bearing dominant positions to recessive
+                print()
+                print("  --- Turn glow off (most stats) ---")
+                off_flips = []
+                off_net = {}
+                target_list = list(current_norm)
+                for i, coord in enumerate(coords5):
+                    if current_norm[i] == "X" and coord in STAT_GENES_CR5:
+                        target_list[i] = "o"
+                        stat_info = STAT_GENES_CR5[coord]
+                        if stat_info[1] > 0:
+                            off_net[stat_info[0]] = off_net.get(stat_info[0], 0) + stat_info[1]
+                        off_flips.append({"coord": coord, "direction": "dominant → recessive", "stat": stat_info})
+                off_target = "".join(target_list)
+                if off_target in GLOW_ON_PATTERNS:
+                    print("  WARNING: Flipping stat genes to recessive still results in a glow-on pattern.")
+                    print("  Additional cosmetic flips may be needed.")
+                elif not off_flips:
+                    print("  All stat genes already recessive — glow is already off at maximum stats.")
+                else:
+                    off_path = {
+                        "target": off_target,
+                        "flips": off_flips,
+                        "flips_count": len(off_flips),
+                        "net_stat": off_net,
+                        "net_total": sum(off_net.values()),
+                    }
+                    show_glow_path_text(off_path, f"Glow off — max stats ({len(off_flips)} flip(s))")
             print()
             print("CR5 stat contributions (recessive positions):")
             if result["expressing"]:
