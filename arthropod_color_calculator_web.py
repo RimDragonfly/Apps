@@ -393,9 +393,10 @@ if st.button("📋 Parse it", type="primary"):
         if parsed_export:
             if parsed_export.get(1): st.session_state["export_cr1"] = parsed_export[1]
             if parsed_export.get(3): st.session_state["export_cr3"] = parsed_export[3]
-            if parsed_export.get(5): st.session_state["parsed_cr5"] = parsed_export[5]
-            if parsed_export.get(9): st.session_state["parsed_cr9"] = parsed_export[9]
+            if parsed_export.get(5): st.session_state["cr5_input"] = parsed_export[5]
+            if parsed_export.get(9): st.session_state["cr9_input"] = parsed_export[9]
             st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}. Scroll down to see results.")
+            st.rerun()
         else:
             st.warning("This doesn't look like a full export — use the individual chromosome fields below.")
     else:
@@ -466,7 +467,73 @@ Please share it with Kaskrim.""")
 
         if status == "already_there":
             st.success(f"✅ Already in the **{target_color}** zone (F-J dom/mixed = {fj}).")
-            st.info("A-E dominant or mixed fine-tunes the exact shade within this zone.")
+
+            # Give specific A-E guidance for the target color within this F-J zone
+            ae_guidance = None
+            if cr == 1:
+                if fj >= 17:
+                    if target_color == "Purple":   ae_guidance = ("below 4",   "ae_decrease", 4)
+                    elif target_color == "Blue-violet": ae_guidance = ("4 to 6", "ae_range", (4, 6))
+                    elif target_color == "Teal":   ae_guidance = ("7 or more", "ae_increase", 7)
+                elif fj in (14, 15, 16):
+                    if target_color == "Blue":     ae_guidance = ("below 5",   "ae_decrease", 5)
+                    elif target_color == "Teal":   ae_guidance = ("5 or more", "ae_increase", 5)
+                elif fj in (11, 12, 13):
+                    if target_color == "Green":    ae_guidance = ("3 to 4",    "ae_range", (3, 4))
+                    elif target_color == "Yellow": ae_guidance = ("5 to 8",    "ae_range", (5, 8))
+                    elif target_color == "Orange": ae_guidance = ("9 or more", "ae_increase", 9)
+                elif fj == 9:
+                    if target_color == "Green":    ae_guidance = ("4 or below", "ae_decrease", 4)
+                    elif target_color == "Yellow": ae_guidance = ("5 to 8",    "ae_range", (5, 8))
+                    elif target_color == "Orange": ae_guidance = ("9 or more", "ae_increase", 9)
+            elif cr == 3:
+                if fj in (9, 10, 11, 12, 13):
+                    if target_color == "Green":    ae_guidance = ("4 or below", "ae_decrease", 4)
+                    elif target_color == "Orange": ae_guidance = ("5 or more", "ae_increase", 5)
+
+            if ae_guidance:
+                label, direction, threshold = ae_guidance
+                current_ae = ae
+                if direction == "ae_increase":
+                    needed = max(0, threshold - current_ae)
+                    if needed > 0:
+                        st.info(
+                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
+                            f"To reach **{target_color}**, you need A-E **{label}** — "
+                            f"flip **{needed} more A-E position(s) to dominant or mixed** (cosmetic positions cost no stats)."
+                        )
+                    else:
+                        st.success(f"A-E dominant or mixed is already {current_ae} — within the {target_color} range.")
+                elif direction == "ae_decrease":
+                    needed = max(0, current_ae - (threshold - 1))
+                    if needed > 0:
+                        st.info(
+                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
+                            f"To reach **{target_color}**, you need A-E **{label}** — "
+                            f"flip **{needed} A-E position(s) to recessive**."
+                        )
+                    else:
+                        st.success(f"A-E dominant or mixed is already {current_ae} — within the {target_color} range.")
+                elif direction == "ae_range":
+                    lo, hi = threshold
+                    if current_ae < lo:
+                        needed = lo - current_ae
+                        st.info(
+                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
+                            f"To reach **{target_color}**, you need A-E **{label}** — "
+                            f"flip **{needed} more A-E position(s) to dominant or mixed**."
+                        )
+                    elif current_ae > hi:
+                        needed = current_ae - hi
+                        st.info(
+                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
+                            f"To reach **{target_color}**, you need A-E **{label}** — "
+                            f"flip **{needed} A-E position(s) to recessive**."
+                        )
+                    else:
+                        st.success(f"A-E dominant or mixed is already {current_ae} — within the {target_color} range.")
+            else:
+                st.info(f"A-E dominant or mixed is {ae}/20 — fine-tunes the exact shade within this zone.")
         else:
             def show_path(path, label):
                 direction = path["direction"]
@@ -876,12 +943,10 @@ col_cr5, col_cr9 = st.columns(2)
 
 with col_cr5:
     st.subheader("CR5 — Glow (10 positions)")
-    _cr5_val = st.session_state.get("parsed_cr5", "")
     cr5_input = st.text_input(
         "CR5 genome string",
         placeholder="e.g. RRRR RDxR DR",
         key="cr5_input",
-        value=_cr5_val,
     )
     if cr5_input.strip():
         result, err = analyze_cr5(cr5_input.strip())
@@ -1033,12 +1098,10 @@ with col_cr5:
 
 with col_cr9:
     st.subheader("CR9 — Particles & Tail Light (20 positions)")
-    _cr9_val = st.session_state.get("parsed_cr9", "")
     cr9_input = st.text_input(
         "CR9 genome string",
         placeholder="e.g. DDxD DRxR xDRR DRRR RRRR",
         key="cr9_input",
-        value=_cr9_val,
     )
     if cr9_input.strip():
         result, err = lookup_cr9(cr9_input.strip())
