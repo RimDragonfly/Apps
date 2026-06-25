@@ -355,271 +355,6 @@ def show_cr9_path(path, label):
             st.markdown(f"  {icon} **{stat}:** {sign}{delta}")
 
 
-st.set_page_config(
-    page_title="Arthropod Color Calculator",
-    page_icon="🐝",
-    layout="centered"
-)
-
-st.title("🐝 Arthropod Color Calculator")
-st.caption("Project Gorgon Genetics Research · Kaskrim & Azizah · Lumière")
-
-st.markdown("""
-Calculate the minimum changes needed to reach a target body or wing color.
-
-**You can paste either:**
-- A single chromosome string (40 positions for CR1/CR3, 10 for CR5, 20 for CR9)
-- Your full game genome export — the app will extract all relevant chromosomes automatically
-
-**Notation:** The app accepts both game export format (`D` `R` `x`) and internal format (`X` `o` `t`) — both work.
-""")
-
-st.warning("⚠️ **Genetics skill must be uncapped at level 100.** Do not use this tool with a genome that contains ? marks.")
-
-# ── Full export paste ──────────────────────────────────────────────────────
-st.markdown("### 📋 Paste Full Genome Export")
-st.markdown("If you have the full game export, paste it here and all chromosomes will be filled in automatically.")
-full_export_input = st.text_area(
-    "Full genome export",
-    placeholder="Paste everything here — starting from [Overview] or [Genes] — and the app will do the rest.",
-    height=150,
-    key="full_export_input",
-    label_visibility="collapsed"
-)
-
-if st.button("📋 Parse it", type="primary"):
-    if full_export_input.strip():
-        parsed_export = parse_full_export(full_export_input.strip())
-        if parsed_export:
-            if parsed_export.get(1): st.session_state["export_cr1"] = parsed_export[1]
-            if parsed_export.get(3): st.session_state["export_cr3"] = parsed_export[3]
-            if parsed_export.get(5): st.session_state["cr5_input"] = parsed_export[5]
-            if parsed_export.get(9): st.session_state["cr9_input"] = parsed_export[9]
-            st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}. Scroll down to see results.")
-            st.rerun()
-        else:
-            st.warning("This doesn't look like a full export — use the individual chromosome fields below.")
-    else:
-        st.warning("Paste your genome export above first.")
-
-st.divider()
-
-col1, col2 = st.columns(2)
-with col1:
-    cr_choice = st.radio(
-        "Chromosome",
-        options=["CR 1 — Body color", "CR 3 — Wing color"],
-        index=0
-    )
-    cr = 1 if "CR 1" in cr_choice else 3
-
-with col2:
-    ladder = COLOR_LADDER_CR1 if cr == 1 else COLOR_LADDER_CR3
-    target_color = st.selectbox(
-        "Target color",
-        options=list(ladder.keys()),
-        index=0
-    )
-
-_cr_key = "export_cr1" if cr == 1 else "export_cr3"
-_prefill = st.session_state.get(_cr_key, "")
-genome_input = st.text_input(
-    "Genome string (40 positions, spaces OK)",
-    placeholder="e.g. RRRR DRRR RRDR RRRR RRRX DRDx DRDD DDDD DDDD RRRD",
-    value=_prefill,
-)
-
-run_color = st.button("🔍 Run color analysis", key="run_color_btn")
-
-if run_color and genome_input.strip():
-    positions, error = parse_genome(genome_input.strip(), cr)
-
-    if error:
-        st.error(f"⚠️ {error}")
-    else:
-        fj = fj_dom_count(positions, cr)
-        ae = ae_dom_count(positions, cr)
-        current_color = detect_color(fj, ae, cr)
-
-        st.divider()
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("F-J dominant or mixed", f"{fj} / 20")
-        m2.metric("A-E dominant or mixed", f"{ae} / 20")
-        m3.metric("Estimated color", current_color)
-
-        # Show low F-J note when genome is below ladder or targeting red with very low F-J
-        if "Below ladder" in current_color or (target_color == "Red" and fj <= 6):
-            st.info("""ℹ️ **Low F-J zone — bottom of the wheel**
-
-The color wheel is circular. Red appears at both ends of the ladder.
-All-recessive on CR 1 is confirmed to produce red by wrapping clockwise past violet.
-
-What other colors may exist in this low F-J zone (F-J=0–6) is **untested**.
-Other colors may be achievable here. Until data points confirm what lives in this zone,
-this app defaults to Red for any genome below F-J=7.
-
-If your bee has an unusual color at very low F-J, that is valuable research data.
-Please share it with Kaskrim.""")
-
-        st.divider()
-
-        target_lo, target_hi = ladder[target_color]
-        status, paths, _ = calculate_changes(positions, cr, target_color)
-
-        if status == "already_there":
-            st.success(f"✅ Already in the **{target_color}** zone (F-J dom/mixed = {fj}).")
-
-            # Give specific A-E guidance for the target color within this F-J zone
-            ae_guidance = None
-            if cr == 1:
-                if fj >= 17:
-                    if target_color == "Purple":   ae_guidance = ("below 4",   "ae_decrease", 4)
-                    elif target_color == "Blue-violet": ae_guidance = ("4 to 6", "ae_range", (4, 6))
-                    elif target_color == "Teal":   ae_guidance = ("7 or more", "ae_increase", 7)
-                elif fj in (14, 15, 16):
-                    if target_color == "Blue":     ae_guidance = ("below 5",   "ae_decrease", 5)
-                    elif target_color == "Teal":   ae_guidance = ("5 or more", "ae_increase", 5)
-                elif fj in (11, 12, 13):
-                    if target_color == "Green":    ae_guidance = ("3 to 4",    "ae_range", (3, 4))
-                    elif target_color == "Yellow": ae_guidance = ("5 to 8",    "ae_range", (5, 8))
-                    elif target_color == "Orange": ae_guidance = ("9 or more", "ae_increase", 9)
-                elif fj == 9:
-                    if target_color == "Green":    ae_guidance = ("4 or below", "ae_decrease", 4)
-                    elif target_color == "Yellow": ae_guidance = ("5 to 8",    "ae_range", (5, 8))
-                    elif target_color == "Orange": ae_guidance = ("9 or more", "ae_increase", 9)
-            elif cr == 3:
-                if fj in (9, 10, 11, 12, 13):
-                    if target_color == "Green":    ae_guidance = ("4 or below", "ae_decrease", 4)
-                    elif target_color == "Orange": ae_guidance = ("5 or more", "ae_increase", 5)
-
-            if ae_guidance:
-                label, direction, threshold = ae_guidance
-                current_ae = ae
-                if direction == "ae_increase":
-                    needed = max(0, threshold - current_ae)
-                    if needed > 0:
-                        st.info(
-                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
-                            f"To reach **{target_color}**, you need A-E **{label}** — "
-                            f"flip **{needed} more A-E position(s) to dominant or mixed** (cosmetic positions cost no stats)."
-                        )
-                    else:
-                        st.success(f"A-E dominant or mixed is already {current_ae} — within the {target_color} range.")
-                elif direction == "ae_decrease":
-                    needed = max(0, current_ae - (threshold - 1))
-                    if needed > 0:
-                        st.info(
-                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
-                            f"To reach **{target_color}**, you need A-E **{label}** — "
-                            f"flip **{needed} A-E position(s) to recessive**."
-                        )
-                    else:
-                        st.success(f"A-E dominant or mixed is already {current_ae} — within the {target_color} range.")
-                elif direction == "ae_range":
-                    lo, hi = threshold
-                    if current_ae < lo:
-                        needed = lo - current_ae
-                        st.info(
-                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
-                            f"To reach **{target_color}**, you need A-E **{label}** — "
-                            f"flip **{needed} more A-E position(s) to dominant or mixed**."
-                        )
-                    elif current_ae > hi:
-                        needed = current_ae - hi
-                        st.info(
-                            f"Your A-E dominant or mixed is currently **{current_ae}/20**. "
-                            f"To reach **{target_color}**, you need A-E **{label}** — "
-                            f"flip **{needed} A-E position(s) to recessive**."
-                        )
-                    else:
-                        st.success(f"A-E dominant or mixed is already {current_ae} — within the {target_color} range.")
-            else:
-                st.info(f"A-E dominant or mixed is {ae}/20 — fine-tunes the exact shade within this zone.")
-        else:
-            def show_path(path, label):
-                direction = path["direction"]
-                needed = path["needed"]
-                selected = path["selected"]
-                cost = path["cost"]
-                pts = path["pts"]
-                feasible = path["feasible"]
-
-                if not feasible:
-                    st.warning(f"⚠️ {label}: Only {len(selected)} eligible positions found — not enough.")
-                    return
-
-                # Calculate net stat change for summary
-                net = sum(cost.values())
-                if pts == 0:
-                    st.success(f"**{label}:** {needed} change(s) — 🟢 no stat cost")
-                elif net > 0:
-                    st.success(f"**{label}:** {needed} change(s) — 🟢 {pts} stat point(s) gained")
-                else:
-                    st.warning(f"**{label}:** {needed} change(s) — 🔴 {pts} stat point(s) lost")
-
-                st.markdown(f"*Direction: {direction}*")
-                for i, (coord, is_stat, stat_name, stat_val) in enumerate(selected):
-                    if is_stat and stat_val > 0:
-                        # dominant→recessive = stat ON = gain; recessive→dominant = stat OFF = loss
-                        if direction == "dominant → recessive":
-                            st.markdown(f"**{i+1}.** `{coord}` · gains **+{stat_val} {stat_name}**")
-                        else:
-                            st.markdown(f"**{i+1}.** `{coord}` · costs **−{stat_val} {stat_name}**")
-                    else:
-                        st.markdown(f"**{i+1}.** `{coord}` · cosmetic, no stat cost")
-
-                if cost:
-                    for stat, delta in sorted(cost.items()):
-                        sign = "+" if delta > 0 else ""
-                        color_str = "🟢" if delta > 0 else "🔴"
-                        st.markdown(f"{color_str} **{stat}:** {sign}{delta}")
-                else:
-                    st.markdown("🟢 **No stat impact.**")
-
-            path_a = paths.get("path_a")
-            path_b = paths.get("path_b")
-
-            if path_b:
-                # Show both paths, recommend cheaper one
-                pts_a = path_a["pts"] if path_a else 999
-                pts_b = path_b["pts"]
-
-                if pts_a <= pts_b:
-                    st.markdown("### ✅ Recommended: Direct path")
-                    show_path(path_a, path_a["label"])
-                    st.divider()
-                    st.markdown(f"### Alternative: {path_b['label']}")
-                    st.caption(f"Costs {pts_b} stat points — more expensive than direct path.")
-                    show_path(path_b, path_b["label"])
-                else:
-                    st.markdown(f"### ✅ Recommended: {path_b['label']}")
-                    st.caption("Cheaper in stat cost than the direct path.")
-                    show_path(path_b, path_b["label"])
-                    st.divider()
-                    st.markdown("### Alternative: Direct path")
-                    st.caption(f"Costs {pts_a} stat points — more expensive.")
-                    show_path(path_a, path_a["label"])
-            else:
-                show_path(path_a, path_a["label"])
-
-st.divider()
-st.markdown("""
-<small>
-Color ladder based on research by Kaskrim and Azizah, 2021–2026.
-F-J dominant or mixed sets broad hue position (more F-J = clockwise = toward purple/blue).
-A-E dominant or mixed fine-tunes within the zone (more A-E = counterclockwise = toward warmer colors).
-The two axes push in opposite directions.
-</small>
-""", unsafe_allow_html=True)
-
-# ============================================================
-# CR5 GLOW + CR9 PARTICLES & TAIL LIGHT
-# ============================================================
-
-# ---- CR5 STAT GENE MAP ----
-# Position: (stat_name, point_value)
-# A1, A3, C1 are cosmetic (_)
 STAT_GENES_CR5 = {
     "5A2": ("Friendliness", 4),
     "5A4": ("Enthusiasm",   4),
@@ -930,117 +665,385 @@ def taillight_paths(taillight_key):
 
 
 # ============================================================
-# CR5 / CR9 UI SECTION
+# UI — Arthropod Visual Trait Calculator
 # ============================================================
 
+st.set_page_config(
+    page_title="Arthropod Visual Trait Calculator",
+    page_icon="🐝",
+    layout="centered"
+)
+
+st.title("🐝 Arthropod Visual Trait Calculator")
+st.caption("Project Gorgon Genetics Research · Kaskrim & Azizah · Lumière")
+st.markdown("Calculate your bee or wasp's current visual traits and get flip instructions to change them.")
+st.warning("⚠️ **Genetics skill must be uncapped at level 100.** Do not use this tool with genomes containing ? marks.")
+
+# ── SECTION 1: Genome Input ───────────────────────────────────────────────
 st.divider()
-st.header("🐝 Visual Traits — CR5 & CR9")
-st.caption("Glow (CR5) · Particles & Tail Light (CR9)")
-st.markdown("""
-Paste your CR5 and CR9 genome strings to look up glow, particle location, and tail light color.
-These are lookup tables — results not in the research data will show as **Unknown** or **Glow off**.
-""")
+st.header("📋 Your Genome")
 
-st.button("🔍 Run visual trait analysis", key="run_visual_btn")
+full_export_input = st.text_area(
+    "Paste your full genome export here",
+    placeholder="Paste everything — starting from [Overview] or [Genes] — and click Parse it.",
+    height=150,
+    key="full_export_input",
+    label_visibility="visible"
+)
 
-col_cr5, col_cr9 = st.columns(2)
-
-with col_cr5:
-    st.subheader("CR5 — Glow (10 positions)")
-    cr5_input = st.text_input(
-        "CR5 genome string",
-        placeholder="e.g. RRRR RDxR DR",
-        key="cr5_input",
-    )
-    if st.session_state.get("run_visual_btn") and cr5_input.strip():
-        result, err = analyze_cr5(cr5_input.strip())
-        if err:
-            st.error(f"⚠️ {err}")
+if st.button("📋 Parse it", type="primary", key="parse_btn"):
+    if full_export_input.strip():
+        parsed = parse_full_export(full_export_input.strip())
+        if parsed:
+            if parsed.get(1): st.session_state["export_cr1"] = parsed[1]
+            if parsed.get(3): st.session_state["export_cr3"] = parsed[3]
+            if parsed.get(5): st.session_state["cr5_input"] = parsed[5]
+            if parsed.get(9): st.session_state["cr9_input"] = parsed[9]
+            st.success(f"✅ Parsed — found: {', '.join(f'CR{k}' for k in sorted(parsed.keys()))}")
+            st.rerun()
         else:
-            if result["glow"]:
-                st.success("✨ **Glow: ON**")
-            else:
-                st.info("🔘 **Glow: Off**")
+            st.warning("Doesn't look like a full export. Use the individual fields below.")
+    else:
+        st.warning("Paste your genome export above first.")
 
-            st.markdown("**CR5 stat contributions (recessive positions):**")
-            if result["expressing"]:
-                for coord, stat_name, stat_val in sorted(result["expressing"]):
-                    st.markdown(f"  `{coord}` → +{stat_val} {stat_name}")
-                st.markdown("**Totals from CR5:**")
-                for stat, total in sorted(result["stat_totals"].items()):
-                    st.markdown(f"  🟢 {stat}: +{total}")
-            else:
-                st.markdown("  No stat genes expressing on CR5.")
+with st.expander("Or enter individual chromosome strings"):
+    _cr1_pre = st.session_state.get("export_cr1", "")
+    _cr3_pre = st.session_state.get("export_cr3", "")
+    ind_cr1 = st.text_input("CR1 — Body color (40 positions)", value=_cr1_pre, placeholder="e.g. DRDDRRRR...")
+    ind_cr3 = st.text_input("CR3 — Wing color (40 positions)", value=_cr3_pre, placeholder="e.g. RRRRDRRR...")
+    ind_cr5 = st.text_input("CR5 — Glow (10 positions)", key="cr5_input", placeholder="e.g. RRRR RDxR DR")
+    ind_cr9 = st.text_input("CR9 — Particles & Tail Light (20 positions)", key="cr9_input", placeholder="e.g. DDxD DRxR xDRR DRRR RRRR")
+    if ind_cr1: st.session_state["export_cr1"] = ind_cr1
+    if ind_cr3: st.session_state["export_cr3"] = ind_cr3
 
-            if result["not_expressing"]:
-                with st.expander("Stat genes not expressing (dominant)"):
-                    for coord, stat_name, stat_val in sorted(result["not_expressing"]):
-                        st.markdown(f"  `{coord}` → {stat_val} {stat_name} (off)")
+# Resolve inputs
+cr1_raw = st.session_state.get("export_cr1", "").strip()
+cr3_raw = st.session_state.get("export_cr3", "").strip()
+cr5_raw = st.session_state.get("cr5_input", "").strip()
+cr9_raw = st.session_state.get("cr9_input", "").strip()
 
-            # ---- Glow: show paths or better-stat alternatives ----
-            if result["glow"]:
-                # Already glowing — check if a better-stat glow-on pattern exists
-                st.divider()
-                st.markdown("**Optimize glow stats:**")
-                current_norm = result["norm"]
-                coords = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
-                better_paths = []
-                current_stat_total = sum(
-                    STAT_GENES_CR5[coord][1]
-                    for i, coord in enumerate(coords)
-                    if current_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
-                )
-                for target_norm in GLOW_ON_PATTERNS:
-                    if target_norm == current_norm:
-                        continue
-                    target_stat_total = sum(
-                        STAT_GENES_CR5[coord][1]
-                        for i, coord in enumerate(coords)
-                        if target_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
-                    )
-                    if target_stat_total > current_stat_total:
-                        flips = []
-                        net_stat = {}
-                        for i, coord in enumerate(coords):
-                            c, t = current_norm[i], target_norm[i]
-                            if c != t:
-                                direction = "recessive → dominant" if t == "X" else "dominant → recessive"
-                                stat_info = STAT_GENES_CR5.get(coord)
-                                if stat_info and stat_info[1] > 0:
-                                    delta = stat_info[1] if "dominant → recessive" in direction else -stat_info[1]
-                                    net_stat[stat_info[0]] = net_stat.get(stat_info[0], 0) + delta
-                                flips.append({"coord": coord, "direction": direction, "stat": stat_info})
-                        better_paths.append({
-                            "target": target_norm,
-                            "flips": flips,
-                            "flips_count": len(flips),
-                            "net_stat": net_stat,
-                            "net_total": sum(net_stat.values()),
-                        })
-                WORST_GLOW_PATTERN = "oooooXXXXo"  # loses both Ferocity and Friendliness
-                is_worst = current_norm == WORST_GLOW_PATTERN
+# Parse what we have
+cr1_data = cr3_data = cr5_data = cr9_data = None
+cr1_err = cr3_err = cr5_err = cr9_err = None
 
-                if better_paths:
-                    if is_worst:
-                        st.warning("⚠️ Your current glow pattern has the lowest stat value of all known glow-on patterns — it costs both Ferocity and Friendliness. All other glow-on patterns are better.")
-                    best = max(better_paths, key=lambda p: p["net_total"])
-                    st.markdown(f"A better-stat glow-on pattern exists (+{best['net_total']} net stats):")
-                    show_glow_path(best, "Better stat option")
-                    if len(better_paths) > 1:
-                        with st.expander(f"Other better options ({len(better_paths) - 1} more)"):
-                            for p in sorted(better_paths, key=lambda p: -p["net_total"])[1:]:
-                                show_glow_path(p, f"Alternative ({p['flips_count']} flip(s))")
+if cr1_raw:
+    _pos, _err = parse_genome(cr1_raw, 1)
+    if _err: cr1_err = _err
+    else: cr1_data = {"positions": _pos, "fj": fj_dom_count(_pos, 1), "ae": ae_dom_count(_pos, 1)}
+    if cr1_data: cr1_data["color"] = detect_color(cr1_data["fj"], cr1_data["ae"], 1)
+
+if cr3_raw:
+    _pos, _err = parse_genome(cr3_raw, 3)
+    if _err: cr3_err = _err
+    else: cr3_data = {"positions": _pos, "fj": fj_dom_count(_pos, 3), "ae": ae_dom_count(_pos, 3)}
+    if cr3_data: cr3_data["color"] = detect_color(cr3_data["fj"], cr3_data["ae"], 3)
+
+if cr5_raw:
+    _res, _err = analyze_cr5(cr5_raw)
+    if _err: cr5_err = _err
+    else: cr5_data = _res
+
+if cr9_raw:
+    _res, _err = lookup_cr9(cr9_raw)
+    if _err: cr9_err = _err
+    else: cr9_data = _res
+
+# ── SECTION 2: Current Traits Summary ────────────────────────────────────
+if any([cr1_data, cr3_data, cr5_data, cr9_data]):
+    st.divider()
+    st.header("🐝 Your Bee — Current Traits")
+
+    cols = st.columns(2)
+    with cols[0]:
+        if cr1_data:
+            st.metric("Body color (CR1)", cr1_data["color"])
+            st.caption(f"F-J: {cr1_data['fj']}/20 · A-E: {cr1_data['ae']}/20")
+        else:
+            st.metric("Body color (CR1)", "—")
+        if cr5_data:
+            glow_label = "✨ ON" if cr5_data["glow"] else "Off"
+            st.metric("Glow (CR5)", glow_label)
+        else:
+            st.metric("Glow (CR5)", "—")
+    with cols[1]:
+        if cr3_data:
+            st.metric("Wing color (CR3)", cr3_data["color"])
+            st.caption(f"F-J: {cr3_data['fj']}/20 · A-E: {cr3_data['ae']}/20")
+        else:
+            st.metric("Wing color (CR3)", "—")
+        if cr9_data:
+            st.metric("Particles (CR9)", cr9_data["particle"])
+            tl = cr9_data["taillight"]
+            tl_label = " or ".join(tl) if cr9_data["taillight_ambiguous"] else (tl[0] if tl != ["Unknown"] else "Unknown")
+            st.metric("Tail light (CR9)", tl_label)
+        else:
+            st.metric("Particles (CR9)", "—")
+            st.metric("Tail light (CR9)", "—")
+
+# ── SECTION 3: Change Body Color (CR1) ───────────────────────────────────
+if cr1_data:
+    st.divider()
+    st.header("🎨 Change Body Color (CR1)")
+    if cr1_err:
+        st.error(f"⚠️ {cr1_err}")
+    else:
+        ladder = COLOR_LADDER_CR1
+        target_color_cr1 = st.selectbox("Target body color", options=list(ladder.keys()), key="target_cr1")
+        if st.button("Get flip instructions", key="run_cr1", type="primary"):
+            status, paths, _ = calculate_changes(cr1_data["positions"], 1, target_color_cr1)
+            fj, ae = cr1_data["fj"], cr1_data["ae"]
+            if status == "already_there":
+                st.success(f"✅ Already in the **{target_color_cr1}** zone (F-J = {fj}).")
+                # A-E guidance
+                ae_guidance = None
+                if fj >= 17:
+                    if target_color_cr1 == "Purple":      ae_guidance = ("below 4",   "ae_decrease", 4)
+                    elif target_color_cr1 == "Blue-violet": ae_guidance = ("4 to 6",   "ae_range", (4,6))
+                    elif target_color_cr1 == "Teal":       ae_guidance = ("7 or more", "ae_increase", 7)
+                elif fj in (14,15,16):
+                    if target_color_cr1 == "Blue":  ae_guidance = ("below 5",   "ae_decrease", 5)
+                    elif target_color_cr1 == "Teal": ae_guidance = ("5 or more", "ae_increase", 5)
+                elif fj in (11,12,13):
+                    if target_color_cr1 == "Green":  ae_guidance = ("3 to 4",    "ae_range", (3,4))
+                    elif target_color_cr1 == "Yellow": ae_guidance = ("5 to 8",   "ae_range", (5,8))
+                    elif target_color_cr1 == "Orange": ae_guidance = ("9 or more","ae_increase", 9)
+                elif fj == 9:
+                    if target_color_cr1 == "Green":  ae_guidance = ("4 or below","ae_decrease", 4)
+                    elif target_color_cr1 == "Yellow": ae_guidance = ("5 to 8",   "ae_range", (5,8))
+                    elif target_color_cr1 == "Orange": ae_guidance = ("9 or more","ae_increase", 9)
+                if ae_guidance:
+                    label, direction, threshold = ae_guidance
+                    if direction == "ae_increase":
+                        needed = max(0, threshold - ae)
+                        if needed > 0:
+                            st.info(f"A-E is currently **{ae}/20**. To reach **{target_color_cr1}**, you need A-E **{label}** — flip **{needed} more A-E position(s) to dominant**.")
+                        else:
+                            st.success(f"A-E is {ae} — already in the {target_color_cr1} range.")
+                    elif direction == "ae_decrease":
+                        needed = max(0, ae - (threshold - 1))
+                        if needed > 0:
+                            st.info(f"A-E is currently **{ae}/20**. To reach **{target_color_cr1}**, you need A-E **{label}** — flip **{needed} A-E position(s) to recessive**.")
+                        else:
+                            st.success(f"A-E is {ae} — already in the {target_color_cr1} range.")
+                    elif direction == "ae_range":
+                        lo, hi = threshold
+                        if ae < lo:
+                            st.info(f"A-E is currently **{ae}/20**. To reach **{target_color_cr1}**, you need A-E **{label}** — flip **{lo-ae} more A-E position(s) to dominant**.")
+                        elif ae > hi:
+                            st.info(f"A-E is currently **{ae}/20**. To reach **{target_color_cr1}**, you need A-E **{label}** — flip **{ae-hi} A-E position(s) to recessive**.")
+                        else:
+                            st.success(f"A-E is {ae} — already in the {target_color_cr1} range.")
                 else:
-                    st.success("Current glow pattern already has the best stats among known glow-on patterns.")
+                    st.info(f"A-E is {ae}/20 — fine-tunes the exact shade within this zone.")
+            else:
+                def show_path(path, label):
+                    direction = path["direction"]; needed = path["needed"]
+                    selected = path["selected"]; cost = path["cost"]
+                    pts = path["pts"]; feasible = path["feasible"]
+                    if not feasible:
+                        st.warning(f"⚠️ {label}: Only {len(selected)} eligible positions found.")
+                        return
+                    net = sum(cost.values())
+                    if pts == 0: st.success(f"**{label}:** {needed} change(s) — 🟢 no stat cost")
+                    elif net > 0: st.success(f"**{label}:** {needed} change(s) — 🟢 {pts} stat point(s) gained")
+                    else: st.warning(f"**{label}:** {needed} change(s) — 🔴 {pts} stat point(s) lost")
+                    st.markdown(f"*Direction: {direction}*")
+                    for i, (coord, is_stat, stat_name, stat_val) in enumerate(selected):
+                        if is_stat and stat_val > 0:
+                            if direction == "dominant → recessive":
+                                st.markdown(f"**{i+1}.** `{coord}` · gains **+{stat_val} {stat_name}**")
+                            else:
+                                st.markdown(f"**{i+1}.** `{coord}` · costs **−{stat_val} {stat_name}**")
+                        else:
+                            st.markdown(f"**{i+1}.** `{coord}` · cosmetic")
+                    if cost:
+                        for stat, delta in sorted(cost.items()):
+                            sign = "+" if delta > 0 else ""
+                            icon = "🟢" if delta > 0 else "🔴"
+                            st.markdown(f"{icon} **{stat}:** {sign}{delta}")
+                path_a = paths.get("path_a")
+                path_b = paths.get("path_b")
+                if path_b:
+                    pts_a = path_a["pts"] if path_a else 999
+                    pts_b = path_b["pts"]
+                    if pts_a <= pts_b:
+                        st.markdown("##### ✅ Recommended: Direct path")
+                        show_path(path_a, path_a["label"])
+                        st.divider()
+                        st.markdown(f"##### Alternative: {path_b['label']}")
+                        show_path(path_b, path_b["label"])
+                    else:
+                        st.markdown(f"##### ✅ Recommended: {path_b['label']}")
+                        show_path(path_b, path_b["label"])
+                        st.divider()
+                        st.markdown("##### Alternative: Direct path")
+                        show_path(path_a, path_a["label"])
+                else:
+                    show_path(path_a, path_a["label"])
 
-                # ---- Glow off: most stats path ----
-                # Flip only stat-bearing dominant positions to recessive.
-                # Leave cosmetics alone. Verify result is not a glow-on pattern.
-                st.divider()
-                st.markdown("**Turn glow off (most stats):**")
-                coords5 = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
-                off_flips = []
-                off_net = {}
+# ── SECTION 4: Change Wing Color (CR3) ───────────────────────────────────
+if cr3_data:
+    st.divider()
+    st.header("🪽 Change Wing Color (CR3)")
+    if cr3_err:
+        st.error(f"⚠️ {cr3_err}")
+    else:
+        ladder3 = COLOR_LADDER_CR3
+        target_color_cr3 = st.selectbox("Target wing color", options=list(ladder3.keys()), key="target_cr3")
+        if st.button("Get flip instructions", key="run_cr3", type="primary"):
+            status, paths, _ = calculate_changes(cr3_data["positions"], 3, target_color_cr3)
+            fj, ae = cr3_data["fj"], cr3_data["ae"]
+            if status == "already_there":
+                st.success(f"✅ Already in the **{target_color_cr3}** zone (F-J = {fj}).")
+                ae_guidance = None
+                if fj in (9,10,11,12,13):
+                    if target_color_cr3 == "Green":  ae_guidance = ("4 or below","ae_decrease", 4)
+                    elif target_color_cr3 == "Orange": ae_guidance = ("5 or more","ae_increase", 5)
+                if ae_guidance:
+                    label, direction, threshold = ae_guidance
+                    if direction == "ae_increase":
+                        needed = max(0, threshold - ae)
+                        if needed > 0: st.info(f"A-E is **{ae}/20**. To reach **{target_color_cr3}**, need A-E **{label}** — flip **{needed} A-E position(s) to dominant**.")
+                        else: st.success(f"A-E is {ae} — already in the {target_color_cr3} range.")
+                    elif direction == "ae_decrease":
+                        needed = max(0, ae - (threshold - 1))
+                        if needed > 0: st.info(f"A-E is **{ae}/20**. To reach **{target_color_cr3}**, need A-E **{label}** — flip **{needed} A-E position(s) to recessive**.")
+                        else: st.success(f"A-E is {ae} — already in the {target_color_cr3} range.")
+                else:
+                    st.info(f"A-E is {ae}/20 — fine-tunes the exact shade within this zone.")
+            else:
+                def show_path_cr3(path, label):
+                    direction = path["direction"]; needed = path["needed"]
+                    selected = path["selected"]; cost = path["cost"]
+                    pts = path["pts"]; feasible = path["feasible"]
+                    if not feasible:
+                        st.warning(f"⚠️ {label}: Only {len(selected)} positions found.")
+                        return
+                    net = sum(cost.values())
+                    if pts == 0: st.success(f"**{label}:** {needed} change(s) — 🟢 no stat cost")
+                    elif net > 0: st.success(f"**{label}:** {needed} change(s) — 🟢 {pts} stat point(s) gained")
+                    else: st.warning(f"**{label}:** {needed} change(s) — 🔴 {pts} stat point(s) lost")
+                    st.markdown(f"*Direction: {direction}*")
+                    for i, (coord, is_stat, stat_name, stat_val) in enumerate(selected):
+                        if is_stat and stat_val > 0:
+                            if direction == "dominant → recessive":
+                                st.markdown(f"**{i+1}.** `{coord}` · gains **+{stat_val} {stat_name}**")
+                            else:
+                                st.markdown(f"**{i+1}.** `{coord}` · costs **−{stat_val} {stat_name}**")
+                        else:
+                            st.markdown(f"**{i+1}.** `{coord}` · cosmetic")
+                    if cost:
+                        for stat, delta in sorted(cost.items()):
+                            sign = "+" if delta > 0 else ""
+                            icon = "🟢" if delta > 0 else "🔴"
+                            st.markdown(f"{icon} **{stat}:** {sign}{delta}")
+                path_a = paths.get("path_a"); path_b = paths.get("path_b")
+                if path_b:
+                    if path_a["pts"] <= path_b["pts"]:
+                        show_path_cr3(path_a, path_a["label"])
+                        with st.expander("Alternative path"): show_path_cr3(path_b, path_b["label"])
+                    else:
+                        show_path_cr3(path_b, path_b["label"])
+                        with st.expander("Alternative path"): show_path_cr3(path_a, path_a["label"])
+                else:
+                    show_path_cr3(path_a, path_a["label"])
+
+# ── SECTION 5: Change Glow (CR5) ─────────────────────────────────────────
+if cr5_data:
+    st.divider()
+    st.header("✨ Change Glow (CR5)")
+
+    glow_on = cr5_data["glow"]
+    current_norm = cr5_data["norm"]
+    coords5 = [f"5{l}{p}" for l, sz in [("A",4),("B",4),("C",2)] for p in range(1, sz+1)]
+
+    glow_choice = st.radio("I want glow:", ["On", "Off"], index=0 if glow_on else 1, horizontal=True, key="glow_choice")
+
+    # Current CR5 stats
+    with st.expander("Current CR5 stat contributions"):
+        if cr5_data["expressing"]:
+            for coord, stat_name, stat_val in sorted(cr5_data["expressing"]):
+                st.markdown(f"  `{coord}` → +{stat_val} {stat_name}")
+            for stat, total in sorted(cr5_data["stat_totals"].items()):
+                st.markdown(f"  🟢 **{stat}:** +{total}")
+        else:
+            st.markdown("No stat genes expressing on CR5.")
+        if cr5_data["not_expressing"]:
+            for coord, stat_name, stat_val in sorted(cr5_data["not_expressing"]):
+                st.markdown(f"  `{coord}` → {stat_val} {stat_name} (off)")
+
+    if glow_choice == "On":
+        if glow_on:
+            # Already on — check for better-stat patterns
+            WORST_GLOW_PATTERN = "oooooXXXXo"
+            is_worst = current_norm == WORST_GLOW_PATTERN
+            current_stat_total = sum(
+                STAT_GENES_CR5[coord][1] for i, coord in enumerate(coords5)
+                if current_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
+            )
+            better_paths = []
+            for target_norm in GLOW_ON_PATTERNS:
+                if target_norm == current_norm: continue
+                target_total = sum(
+                    STAT_GENES_CR5[coord][1] for i, coord in enumerate(coords5)
+                    if target_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
+                )
+                if target_total > current_stat_total:
+                    flips, net_stat = [], {}
+                    for i, coord in enumerate(coords5):
+                        c, t = current_norm[i], target_norm[i]
+                        if c != t:
+                            direction = "recessive → dominant" if t == "X" else "dominant → recessive"
+                            stat_info = STAT_GENES_CR5.get(coord)
+                            if stat_info and stat_info[1] > 0:
+                                delta = stat_info[1] if "dominant → recessive" in direction else -stat_info[1]
+                                net_stat[stat_info[0]] = net_stat.get(stat_info[0], 0) + delta
+                            flips.append({"coord": coord, "direction": direction, "stat": stat_info})
+                    better_paths.append({"target": target_norm, "flips": flips, "flips_count": len(flips),
+                                         "net_stat": net_stat, "net_total": sum(net_stat.values())})
+            if is_worst:
+                st.warning("⚠️ Your current glow pattern has the lowest stat value of all known glow-on patterns — it costs both Ferocity and Friendliness. All other glow-on patterns are better.")
+            if better_paths:
+                best = max(better_paths, key=lambda p: p["net_total"])
+                st.markdown(f"✨ Glow is already **ON** — but a better-stat pattern exists (+{best['net_total']} net stats):")
+                show_glow_path(best, "Better stat option")
+                if len(better_paths) > 1:
+                    with st.expander(f"Other better options ({len(better_paths)-1} more)"):
+                        for p in sorted(better_paths, key=lambda p: -p["net_total"])[1:]:
+                            show_glow_path(p, f"Alternative ({p['flips_count']} flip(s))")
+            else:
+                st.success("✨ Glow is **ON** — current pattern already has the best stats among known glow-on patterns.")
+        else:
+            # Want on, currently off — show three paths
+            FEROCITY_PATTERN    = "oooooXoXoo"
+            FRIENDLINESS_PATTERN = "oooooXXoXo"
+            paths_speed, _ = glow_on_paths(cr5_data["positions"], current_norm)
+            fastest  = paths_speed[0]
+            fe_path  = next((p for p in paths_speed if p["target"] == FEROCITY_PATTERN), None)
+            fr_path  = next((p for p in paths_speed if p["target"] == FRIENDLINESS_PATTERN), None)
+            st.markdown("##### ⚡ Shortest path to glow on")
+            show_glow_path(fastest, "Shortest path")
+            st.markdown("##### Path to −1 Ferocity glow")
+            if fe_path and fe_path["flips_count"] == 0: st.success("Already on this pattern.")
+            elif fe_path: show_glow_path(fe_path, f"{fe_path['flips_count']} flip(s)")
+            else: st.info("No path available.")
+            st.markdown("##### Path to −3 Friendliness glow")
+            if fr_path and fr_path["flips_count"] == 0: st.success("Already on this pattern.")
+            elif fr_path: show_glow_path(fr_path, f"{fr_path['flips_count']} flip(s)")
+            else: st.info("No path available.")
+
+    else:  # Glow Off
+        if not glow_on:
+            # Already off — check if stat improvement possible
+            current_stat_total = sum(
+                STAT_GENES_CR5[coord][1] for i, coord in enumerate(coords5)
+                if current_norm[i] == "o" and coord in STAT_GENES_CR5 and STAT_GENES_CR5[coord][1] > 0
+            )
+            max_possible = sum(v[1] for v in STAT_GENES_CR5.values())
+            if current_stat_total >= max_possible:
+                st.success("🔘 Glow is **Off** — all CR5 stat genes already expressing.")
+            else:
+                off_flips, off_net = [], {}
                 target_list = list(current_norm)
                 for i, coord in enumerate(coords5):
                     if current_norm[i] == "X" and coord in STAT_GENES_CR5:
@@ -1051,182 +1054,127 @@ with col_cr5:
                         off_flips.append({"coord": coord, "direction": "dominant → recessive", "stat": stat_info})
                 off_target = "".join(target_list)
                 if off_target in GLOW_ON_PATTERNS:
-                    st.warning("⚠️ Flipping stat genes to recessive still results in a glow-on pattern — additional cosmetic flips may be needed. This is an unusual case.")
-                elif not off_flips:
-                    st.success("All stat genes already recessive — glow is already off at maximum stats.")
+                    st.warning("⚠️ Flipping stat genes to recessive would result in a glow-on pattern. Additional cosmetic flip needed.")
+                elif off_flips:
+                    st.markdown("🔘 Glow is **Off** — but stat genes could be improved:")
+                    off_path = {"target": off_target, "flips": off_flips, "flips_count": len(off_flips),
+                                "net_stat": off_net, "net_total": sum(off_net.values())}
+                    show_glow_path(off_path, f"Max stats glow-off ({len(off_flips)} flip(s))")
                 else:
-                    off_path = {
-                        "target": off_target,
-                        "flips": off_flips,
-                        "flips_count": len(off_flips),
-                        "net_stat": off_net,
-                        "net_total": sum(off_net.values()),
-                    }
-                    show_glow_path(off_path, f"Glow off — max stats ({len(off_flips)} flip(s))")
-
-            elif not result["glow"]:
-                st.divider()
-                st.markdown("**Paths to turn glow on:**")
-                paths_speed, paths_stat = glow_on_paths(result["positions"], result["norm"])
-
-                # Three fixed sections:
-                # 1. Shortest path to any glow-on
-                # 2. Path to -1 Ferocity pattern
-                # 3. Path to -3 Friendliness pattern
-                FEROCITY_PATTERN    = "oooooXoXoo"
-                FRIENDLINESS_PATTERN = "oooooXXoXo"
-
-                fastest = paths_speed[0]
-                st.markdown("##### ⚡ Shortest path to glow")
-                show_glow_path(fastest, "Shortest path")
-
-                # Path to -1 Ferocity pattern
-                fe_path = next((p for p in paths_speed if p["target"] == FEROCITY_PATTERN), None)
-                st.markdown("##### Path to −1 Ferocity glow")
-                if fe_path and fe_path["flips_count"] == 0:
-                    st.success("Already on this pattern.")
-                elif fe_path:
-                    show_glow_path(fe_path, f"{fe_path['flips_count']} flip(s)")
-                else:
-                    st.info("No path available.")
-
-                # Path to -3 Friendliness pattern
-                fr_path = next((p for p in paths_speed if p["target"] == FRIENDLINESS_PATTERN), None)
-                st.markdown("##### Path to −3 Friendliness glow")
-                if fr_path and fr_path["flips_count"] == 0:
-                    st.success("Already on this pattern.")
-                elif fr_path:
-                    show_glow_path(fr_path, f"{fr_path['flips_count']} flip(s)")
-                else:
-                    st.info("No path available.")
-
-with col_cr9:
-    st.subheader("CR9 — Particles & Tail Light (20 positions)")
-    cr9_input = st.text_input(
-        "CR9 genome string",
-        placeholder="e.g. DDxD DRxR xDRR DRRR RRRR",
-        key="cr9_input",
-    )
-    if st.session_state.get("run_visual_btn") and cr9_input.strip():
-        result, err = lookup_cr9(cr9_input.strip())
-        if err:
-            st.error(f"⚠️ {err}")
+                    st.success("🔘 Glow is **Off** — all CR5 stat genes already expressing.")
         else:
-            p = result["particle"]
-            tl = result["taillight"]
-            ambiguous = result["taillight_ambiguous"]
-
-            p_icon = {"Tail": "🐝", "Wing": "🪽", "None": "⬜", "Unknown": "❓"}.get(p, "❓")
-            st.markdown(f"**Particles:** {p_icon} {p}")
-
-            if tl == ["Unknown"]:
-                st.markdown("**Tail light:** ❓ Unknown")
-                st.caption("This pattern isn't in the research data yet. If you know what tail light color this bee has, please share the genome with Kaskrim at twitch.tv/kaskrim.")
-            elif ambiguous:
-                colors_str = " or ".join(tl)
-                st.warning(f"**Tail light:** ⚠️ {colors_str}")
-                st.caption(
-                    f"This genome pattern matches multiple tail light colors in the research data "
-                    f"({colors_str}). The decode for this pattern is not yet confirmed. "
-                    f"If you can confirm which color your bee actually has, please share it with "
-                    f"Kaskrim at twitch.tv/kaskrim — it will help resolve the ambiguity."
-                )
+            # Want off, currently on — flip stat genes to recessive
+            off_flips, off_net = [], {}
+            target_list = list(current_norm)
+            for i, coord in enumerate(coords5):
+                if current_norm[i] == "X" and coord in STAT_GENES_CR5:
+                    target_list[i] = "o"
+                    stat_info = STAT_GENES_CR5[coord]
+                    if stat_info[1] > 0:
+                        off_net[stat_info[0]] = off_net.get(stat_info[0], 0) + stat_info[1]
+                    off_flips.append({"coord": coord, "direction": "dominant → recessive", "stat": stat_info})
+            off_target = "".join(target_list)
+            if off_target in GLOW_ON_PATTERNS:
+                st.warning("⚠️ Flipping stat genes alone still results in a glow-on pattern. An additional cosmetic flip is needed.")
+            elif not off_flips:
+                st.success("All stat genes already recessive — glow is effectively off at max stats.")
             else:
-                st.markdown(f"**Tail light:** 💡 {tl[0]}")
+                off_path = {"target": off_target, "flips": off_flips, "flips_count": len(off_flips),
+                            "net_stat": off_net, "net_total": sum(off_net.values())}
+                show_glow_path(off_path, f"Turn glow off — max stats ({len(off_flips)} flip(s))")
 
-            if p == "Unknown":
-                st.caption("Particle result unknown — pattern not in research data. Share with Kaskrim at twitch.tv/kaskrim.")
+# ── SECTION 6: Change Particles & Tail Light (CR9) ───────────────────────
+if cr9_data:
+    st.divider()
+    st.header("🐝 Change Particles & Tail Light (CR9)")
+    norm_cr9, _ = normalize_genome_str(cr9_raw, 20)
 
-            # ---- Particle target dropdown ----
-            st.divider()
-            st.markdown("**Change particle location:**")
-            particle_options = ["Tail", "Wing", "None"]
-            current_label = p if p in particle_options else None
-            default_idx = particle_options.index(current_label) if current_label in particle_options else 0
-            target_particle = st.selectbox(
-                "Target particle location",
-                options=particle_options,
-                index=default_idx,
-                key="target_particle",
-                format_func=lambda x: {"Tail": "🐝 Tail", "Wing": "🪽 Wing", "None": "⬜ None"}.get(x, x)
-            )
+    if norm_cr9:
+        particle_key   = norm_cr9[:10]
+        taillight_key  = norm_cr9[10:]
 
-            norm_full, _ = normalize_genome_str(cr9_input.strip(), 20)
-            if norm_full:
-                particle_key = norm_full[:10]
-                if target_particle == p:
-                    # Same type — check if a better-stat pattern exists within this type
-                    paths = particle_paths(particle_key)
-                    p_result = paths.get(target_particle)
-                    best_stat = p_result["best_stat"] if p_result else None
-                    if best_stat and best_stat["flips_count"] > 0 and best_stat["net_total"] > 0:
-                        st.success(f"Already {target_particle} particles.")
-                        st.markdown("📈 **A better-stat pattern exists for this type:**")
-                        show_cr9_path(best_stat, "Better stat option")
-                    elif best_stat and best_stat["flips_count"] > 0 and best_stat["net_total"] == 0:
-                        st.success(f"Already {target_particle} particles — current pattern has optimal stats for this type.")
-                    else:
-                        st.success(f"Already {target_particle} particles — current pattern has optimal stats for this type.")
+        col_p, col_t = st.columns(2)
+
+        with col_p:
+            st.subheader("Particle location")
+            p = cr9_data["particle"]
+            p_icon = {"Tail":"🐝","Wing":"🪽","None":"⬜","Unknown":"❓"}.get(p,"❓")
+            st.markdown(f"**Current:** {p_icon} {p}")
+            particle_options = ["Tail","Wing","None"]
+            target_p = st.selectbox("Target particle location", options=particle_options,
+                                    index=particle_options.index(p) if p in particle_options else 0,
+                                    key="target_particle",
+                                    format_func=lambda x: {"Tail":"🐝 Tail","Wing":"🪽 Wing","None":"⬜ None"}.get(x,x))
+            if target_p == p:
+                paths = particle_paths(particle_key)
+                p_result = paths.get(target_p)
+                best_stat = p_result["best_stat"] if p_result else None
+                if best_stat and best_stat["flips_count"] > 0 and best_stat["net_total"] > 0:
+                    st.markdown("📈 A better-stat pattern exists for this location:")
+                    show_cr9_path(best_stat, "Better stat option")
+                else:
+                    st.success(f"Already {target_p} — optimal stats for this location.")
+            else:
+                if target_p == "None":
+                    st.info("No-particle states are achievable but not yet documented in the research data.")
                 else:
                     paths = particle_paths(particle_key)
-                    p_result = paths.get(target_particle)
+                    p_result = paths.get(target_p)
                     fastest = p_result["fastest"] if p_result else None
                     best_stat = p_result["best_stat"] if p_result else None
-                    if fastest is None:
-                        if target_particle == "None":
-                            st.info("No-particle states are achievable but the research data in this app doesn't yet include documented patterns to aim for. Check back as more data is added.")
-                        else:
-                            st.info("No known pattern available for this particle location.")
-                    else:
+                    if fastest:
                         st.markdown("##### ⚡ Fewest flips")
                         show_cr9_path(fastest, "Fastest path")
                         if best_stat and best_stat["target"] != fastest["target"]:
                             st.markdown("##### 📈 Best stat outcome")
                             show_cr9_path(best_stat, "Best stat path")
                         else:
-                            st.caption("The fastest path is also the best stat outcome.")
-
-            # ---- Tail light color target dropdown ----
-            st.divider()
-            st.markdown("**Change tail light color:**")
-            norm_full2, _ = normalize_genome_str(cr9_input.strip(), 20)
-            if norm_full2:
-                taillight_key = norm_full2[10:]
-                # Build color options from lookup
-                all_colors = sorted(set(
-                    color for colors in TAILLIGHT_LOOKUP.values() for color in colors
-                ))
-                current_tl = tl[0] if tl and tl != ["Unknown"] and not ambiguous else None
-                default_tl_idx = all_colors.index(current_tl) if current_tl in all_colors else 0
-                target_tl = st.selectbox(
-                    "Target tail light color",
-                    options=all_colors,
-                    index=default_tl_idx,
-                    key="target_taillight"
-                )
-                if current_tl and target_tl == current_tl:
-                    st.success(f"Already {target_tl} — no flips needed.")
-                else:
-                    tl_paths = taillight_paths(taillight_key)
-                    tl_result = tl_paths.get(target_tl)
-                    tl_fastest = tl_result["fastest"] if tl_result else None
-                    tl_best_stat = tl_result["best_stat"] if tl_result else None
-                    if tl_fastest is None:
-                        st.info(f"No known pattern for {target_tl} in research data.")
+                            st.caption("Fastest path is also the best stat outcome.")
                     else:
-                        st.markdown("##### ⚡ Fewest flips")
-                        show_cr9_path(tl_fastest, "Fastest path")
-                        if tl_best_stat and tl_best_stat["target"] != tl_fastest["target"]:
-                            st.markdown("##### 📈 Best stat outcome")
-                            show_cr9_path(tl_best_stat, "Best stat path")
-                        else:
-                            st.caption("The fastest path is also the best stat outcome.")
+                        st.info(f"No known pattern for {target_p} in research data.")
 
+        with col_t:
+            st.subheader("Tail light color")
+            tl = cr9_data["taillight"]
+            ambiguous = cr9_data["taillight_ambiguous"]
+            if tl == ["Unknown"]:
+                st.markdown("**Current:** ❓ Unknown")
+                st.caption("Pattern not in research data. Share with Kaskrim at twitch.tv/kaskrim.")
+            elif ambiguous:
+                st.markdown(f"**Current:** ⚠️ {' or '.join(tl)} (ambiguous)")
+                st.caption(f"Needs more data. If you can confirm, share with Kaskrim at twitch.tv/kaskrim.")
+            else:
+                st.markdown(f"**Current:** 💡 {tl[0]}")
+
+            all_colors = sorted(set(color for colors in TAILLIGHT_LOOKUP.values() for color in colors))
+            current_tl = tl[0] if tl and tl != ["Unknown"] and not ambiguous else None
+            default_idx = all_colors.index(current_tl) if current_tl in all_colors else 0
+            target_tl = st.selectbox("Target tail light color", options=all_colors, index=default_idx, key="target_taillight")
+
+            if current_tl and target_tl == current_tl:
+                st.success(f"Already {target_tl} — no flips needed.")
+            else:
+                tl_paths = taillight_paths(taillight_key)
+                tl_result = tl_paths.get(target_tl)
+                tl_fastest = tl_result["fastest"] if tl_result else None
+                tl_best    = tl_result["best_stat"] if tl_result else None
+                if tl_fastest:
+                    st.markdown("##### ⚡ Fewest flips")
+                    show_cr9_path(tl_fastest, "Fastest path")
+                    if tl_best and tl_best["target"] != tl_fastest["target"]:
+                        st.markdown("##### 📈 Best stat outcome")
+                        show_cr9_path(tl_best, "Best stat path")
+                    else:
+                        st.caption("Fastest path is also the best stat outcome.")
+                else:
+                    st.info(f"No known pattern for {target_tl} in research data.")
+
+# ── Footer ────────────────────────────────────────────────────────────────
 st.divider()
 st.markdown("""
 <small>
+Color ladder based on research by Kaskrim and Azizah, 2021–2026.
 Glow and particle data: Kaskrim, 2026. Tail light series data: community research.
 Lookup tables are incomplete — Unknown = not yet documented, not necessarily absent.
 </small>
 """, unsafe_allow_html=True)
-
