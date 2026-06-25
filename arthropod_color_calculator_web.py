@@ -695,6 +695,9 @@ if st.button("📋 Parse it", type="primary", key="parse_btn"):
     if full_export_input.strip():
         parsed = parse_full_export(full_export_input.strip())
         if parsed:
+            # Clear all chromosome fields first so stale values don't carry over
+            for key in ["export_cr1", "export_cr3", "cr5_input", "cr9_input"]:
+                st.session_state[key] = ""
             if parsed.get(1): st.session_state["export_cr1"] = parsed[1]
             if parsed.get(3): st.session_state["export_cr3"] = parsed[3]
             if parsed.get(5): st.session_state["cr5_input"] = parsed[5]
