@@ -393,8 +393,8 @@ if st.button("📋 Parse it", type="primary"):
         if parsed_export:
             if parsed_export.get(1): st.session_state["export_cr1"] = parsed_export[1]
             if parsed_export.get(3): st.session_state["export_cr3"] = parsed_export[3]
-            if parsed_export.get(5): st.session_state["cr5_input"] = parsed_export[5]
-            if parsed_export.get(9): st.session_state["cr9_input"] = parsed_export[9]
+            if parsed_export.get(5): st.session_state["parsed_cr5"] = parsed_export[5]
+            if parsed_export.get(9): st.session_state["parsed_cr9"] = parsed_export[9]
             st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}. Scroll down to see results.")
         else:
             st.warning("This doesn't look like a full export — use the individual chromosome fields below.")
@@ -876,10 +876,12 @@ col_cr5, col_cr9 = st.columns(2)
 
 with col_cr5:
     st.subheader("CR5 — Glow (10 positions)")
+    _cr5_val = st.session_state.get("parsed_cr5", "")
     cr5_input = st.text_input(
         "CR5 genome string",
         placeholder="e.g. RRRR RDxR DR",
         key="cr5_input",
+        value=_cr5_val,
     )
     if cr5_input.strip():
         result, err = analyze_cr5(cr5_input.strip())
@@ -1031,10 +1033,12 @@ with col_cr5:
 
 with col_cr9:
     st.subheader("CR9 — Particles & Tail Light (20 positions)")
+    _cr9_val = st.session_state.get("parsed_cr9", "")
     cr9_input = st.text_input(
         "CR9 genome string",
         placeholder="e.g. DDxD DRxR xDRR DRRR RRRR",
         key="cr9_input",
+        value=_cr9_val,
     )
     if cr9_input.strip():
         result, err = lookup_cr9(cr9_input.strip())
