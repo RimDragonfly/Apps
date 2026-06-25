@@ -383,90 +383,52 @@ STAT_GENES_CR9 = {
 }
 # A2, B1, C1, C3, C4, D3, E2, E3 are cosmetic (_)
 
-# CR5 glow-on patterns (normalized, 10 chars)
-# Anything not in this set = glow off
-GLOW_ON_PATTERNS = {
-    "oooooXXXXo",  # glow on
-    "oooooXXooo",  # glow on
-    "oooooXXoXo",  # glow on
-    "oooooXoXoo",  # glow on
-}
+# ---- Visual trait lookups loaded from external data file ----
+import os as _os
 
-# ---- CR9 PARTICLE LOOKUP ----
-# Uses first 10 positions of CR9 (A1-A4, B1-B4, C1-C2)
-# Key: 10-char normalized string
-# Value: "Tail" | "Wing" | "None"
-PARTICLE_LOOKUP = {
-    # Tail particles
-    "XXXXXooXXX": "Tail",
-    "XXXXXoXoXX": "Tail",
-    "XXXXXXooXX": "Tail",
-    "XXXXoooXXX": "Tail",
-    "XXXoXoXoXo": "Tail",
-    "XXXoXooXXX": "Tail",
-    "XXXoXoooXX": "Tail",
-    "XXXoooooXX": "Tail",
-    "XXoXXoooXX": "Tail",
-    "XXooXoooоX": "Tail",
-    "XoXXXoooXX": "Tail",
-    # Wing particles
-    "XooXXXXXXX": "Wing",
-    "oXoXXXXXXX": "Wing",
-    "ooXXXXXXXX": "Wing",
-    # No particles
-    "XooooooooX": "None",
-    "XXXXXXXXXX": "None",
-}
+def load_visual_data(filepath=None):
+    """Load arthropod visual trait lookup tables from arthropod_visual_data.txt.
+    Falls back to empty tables if file not found.
+    Returns: (taillight_lookup, particle_lookup, glow_on_patterns)
+    """
+    if filepath is None:
+        filepath = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "arthropod_visual_data.txt")
+    taillight = {}
+    particles = {}
+    glow_on   = set()
+    if not _os.path.exists(filepath):
+        return taillight, particles, glow_on
+    current_section = None
+    with open(filepath, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                current_section = line[1:-1].lower()
+                continue
+            if current_section == "taillight":
+                if "=" in line:
+                    pattern, _, label = line.partition("=")
+                    pattern = pattern.replace(" ", "").strip()
+                    label = label.strip()
+                    if pattern and label:
+                        taillight.setdefault(pattern, []).append(label)
+            elif current_section == "particles":
+                if "=" in line:
+                    pattern, _, label = line.partition("=")
+                    pattern = pattern.replace(" ", "").strip()
+                    label = label.strip()
+                    if pattern and label:
+                        particles[pattern] = label
+            elif current_section == "glow_on":
+                pattern = line.replace(" ", "").strip()
+                if pattern and "=" not in pattern:
+                    glow_on.add(pattern)
+    return taillight, particles, glow_on
 
-# ---- CR9 TAIL LIGHT LOOKUP ----
-# Uses last 10 positions of CR9 (C3-C4, D1-D4, E1-E4)
-# Key: 10-char normalized string
-# Value: color name string
-# Tail light lookup: key -> list of possible colors
-# Source: Kaskrim raw data, correctly parsed
-TAILLIGHT_LOOKUP = {
-    "oXXooXooXo": ["Wave Teal"],
-    "oXXooooXoo": ["Poison Green"],
-    "XXoooXoooo": ["Poison Green"],
-    "ooXoXooooo": ["Poison Green"],
-    "ooXXoXoXoo": ["Golden Yellow"],
-    "ooXoXXoXoo": ["Golden Yellow"],
-    "ooXoXoXXoo": ["Golden Yellow"],
-    "ooXooXooXo": ["Golden Yellow"],
-    "oXoooooXXo": ["Aqua Blue"],
-    "XoXooXoXoo": ["Aqua Blue"],
-    "ooXooooXoo": ["Aqua Blue"],
-    "XoooXooXXX": ["Aqua Blue"],
-    "oooXXooXoo": ["Aqua Blue"],
-    "oXooooXXXX": ["Red Orange"],
-    "XoXoXXXXXX": ["Red Orange"],
-    "oXXoXXXXoX": ["Firey Pink"],
-    "XoXoXXXXXo": ["Firey Pink"],
-    "XoXoXXXXoX": ["Firey Pink"],
-    "ooXoooXXoo": ["Firey Pink"],
-    "ooXooXoXoo": ["Firey Pink"],
-    "XoXXXooXoo": ["Galaxy Purple"],
-    "XoXoooooXo": ["Galaxy Purple"],
-    "XoXooooooo": ["Galaxy Purple"],
-    "ooXoXXXXXo": ["Galaxy Purple"],
-    "ooXoXXXXoX": ["Galaxy Purple"],
-    "ooXooXXXoo": ["Galaxy Purple"],
-    "ooooooXXXo": ["Galaxy Purple"],
-    "oXooooooXo": ["White/Purp/Teal"],
-    "ooXooooooo": ["White/Purp/Teal"],
-    "XXoooXooXo": ["White/Purp/Teal"],
-    "XoXooXoooo": ["White/Purp/Teal"],
-    "ooXoXXXXoo": ["White Frosty"],
-    "ooXXoooXoo": ["White Noise"],
-    "ooXoXooXoo": ["White Noise"],
-    "ooXooooooX": ["White Noise"],
-    "ooooooooXo": ["none"],
-    "oXoooooXXX": ["none"],
-    "oXooooXoXo": ["none"],
-    "XoXooXoXXo": ["none"],
-    "ooXooooXXo": ["none"],
-    "ooXooooXoX": ["none"],
-}
+TAILLIGHT_LOOKUP, PARTICLE_LOOKUP, GLOW_ON_PATTERNS = load_visual_data()
+
 
 def normalize_genome_str(raw, expected_len):
     """Normalize a genome string to o/X notation, strip spaces."""

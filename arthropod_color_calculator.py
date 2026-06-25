@@ -16,6 +16,51 @@ Notation: o = recessive, x/X/t = mixed, D/d = dominant
 All non-recessive positions count as dominant or mixed for hue purposes.
 """
 
+import os as _os
+
+def load_visual_data(filepath=None):
+    """Load arthropod visual trait lookup tables from arthropod_visual_data.txt."""
+    if filepath is None:
+        filepath = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "arthropod_visual_data.txt")
+    taillight = {}
+    particles = {}
+    glow_on   = set()
+    if not _os.path.exists(filepath):
+        print(f"WARNING: Visual data file not found: {filepath}")
+        print("Add arthropod_visual_data.txt next to this script to enable lookups.")
+        return taillight, particles, glow_on
+    current_section = None
+    with open(filepath, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                current_section = line[1:-1].lower()
+                continue
+            if current_section == "taillight":
+                if "=" in line:
+                    pattern, _, label = line.partition("=")
+                    pattern = pattern.replace(" ", "").strip()
+                    label = label.strip()
+                    if pattern and label:
+                        taillight.setdefault(pattern, []).append(label)
+            elif current_section == "particles":
+                if "=" in line:
+                    pattern, _, label = line.partition("=")
+                    pattern = pattern.replace(" ", "").strip()
+                    label = label.strip()
+                    if pattern and label:
+                        particles[pattern] = label
+            elif current_section == "glow_on":
+                pattern = line.replace(" ", "").strip()
+                if pattern and "=" not in pattern:
+                    glow_on.add(pattern)
+    return taillight, particles, glow_on
+
+TAILLIGHT_LOOKUP, PARTICLE_LOOKUP, GLOW_ON_PATTERNS = load_visual_data()
+
+
 # ============================================================
 # GENE MAPS
 # ============================================================

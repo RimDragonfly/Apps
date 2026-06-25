@@ -1,0 +1,106 @@
+# Arthropod Visual Trait Data
+# Project Gorgon Genetics Research — Kaskrim
+# Last updated: June 2026
+#
+# FORMAT:
+#   Lines starting with # are comments — ignored by the app
+#   Blank lines are ignored
+#   Section headers are in [brackets]
+#   Data lines are: pattern = label
+#   Patterns use X/o notation (X=dominant or mixed, o=recessive)
+#   For [glow_on], list patterns one per line with no = sign
+#
+# ADDING NEW ENTRIES:
+#   Find the right section and add a new line: pattern = color/location
+#   Pattern must be the correct length for that chromosome region:
+#     Tail light:  10 characters (CR9 positions C3-E4)
+#     Particles:   10 characters (CR9 positions A1-C2)
+#     Glow on:     10 characters (CR5 positions A1-C2)
+#   Spaces in patterns are ignored — you can add them for readability
+#   Example: oXXo oXoo Xo = Wave Teal  (same as oXXooXooXo = Wave Teal)
+
+# ============================================================
+# TAIL LIGHT COLORS
+# Source: community research via Kaskrim's Discord 2021-2026
+# Key = CR9 positions C3-C4, D1-D4, E1-E4 (last 10 of CR9)
+# ============================================================
+
+[taillight]
+oXXooXooXo = Wave Teal
+oXXooooXoo = Poison Green
+XXoooXoooo = Poison Green
+ooXoXooooo = Poison Green
+ooXXoXoXoo = Golden Yellow
+ooXoXXoXoo = Golden Yellow
+ooXoXoXXoo = Golden Yellow
+ooXooXooXo = Golden Yellow
+oXoooooXXo = Aqua Blue
+XoXooXoXoo = Aqua Blue
+ooXooooXoo = Aqua Blue
+XoooXooXXX = Aqua Blue
+oooXXooXoo = Aqua Blue
+oXooooXXXX = Red Orange
+XoXoXXXXXX = Red Orange
+oXXoXXXXoX = Firey Pink
+XoXoXXXXXo = Firey Pink
+XoXoXXXXoX = Firey Pink
+ooXoooXXoo = Firey Pink
+ooXooXoXoo = Firey Pink
+XoXXXooXoo = Galaxy Purple
+XoXoooooXo = Galaxy Purple
+XoXooooooo = Galaxy Purple
+ooXoXXXXXo = Galaxy Purple
+ooXoXXXXoX = Galaxy Purple
+ooXooXXXoo = Galaxy Purple
+ooooooXXXo = Galaxy Purple
+oXooooooXo = White/Purp/Teal
+ooXooooooo = White/Purp/Teal
+XXoooXooXo = White/Purp/Teal
+XoXooXoooo = White/Purp/Teal
+ooXoXXXXoo = White Frosty
+ooXXoooXoo = White Noise
+ooXoXooXoo = White Noise
+ooXooooooX = White Noise
+ooooooooXo = none
+oXoooooXXX = none
+oXooooXoXo = none
+XoXooXoXXo = none
+ooXooooXXo = none
+ooXooooXoX = none
+
+# ============================================================
+# PARTICLE LOCATION
+# Source: Kaskrim, 2026
+# Key = CR9 positions A1-A4, B1-B4, C1-C2 (first 10 of CR9)
+# ============================================================
+
+[particles]
+XXXXXooXXX = Tail
+XXXXXoXoXX = Tail
+XXXXXXooXX = Tail
+XXXXoooXXX = Tail
+XXXoXoXoXo = Tail
+XXXoXooXXX = Tail
+XXXoXoooXX = Tail
+XXXoooooXX = Tail
+XXoXXoooXX = Tail
+XoXXXoooXX = Tail
+XooXXXXXXX = Wing
+oXoXXXXXXX = Wing
+ooXXXXXXXX = Wing
+XooooooooX = None
+XXXXXXXXXX = None
+
+# ============================================================
+# GLOW ON PATTERNS
+# Source: Kaskrim, 2026
+# Key = full CR5 string (10 positions A1-A4, B1-B4, C1-C2)
+# List one pattern per line — no = sign needed
+# All other CR5 patterns are treated as Glow Off
+# ============================================================
+
+[glow_on]
+oooooXXXXo
+oooooXXooo
+oooooXXoXo
+oooooXoXoo
