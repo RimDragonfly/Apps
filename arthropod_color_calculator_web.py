@@ -391,12 +391,11 @@ if st.button("📋 Parse it", type="primary"):
     if full_export_input.strip():
         parsed_export = parse_full_export(full_export_input.strip())
         if parsed_export:
-            st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}")
             if parsed_export.get(1): st.session_state["export_cr1"] = parsed_export[1]
             if parsed_export.get(3): st.session_state["export_cr3"] = parsed_export[3]
             if parsed_export.get(5): st.session_state["cr5_input"] = parsed_export[5]
             if parsed_export.get(9): st.session_state["cr9_input"] = parsed_export[9]
-            st.rerun()
+            st.success(f"✅ Export parsed — found chromosomes: {', '.join(f'CR{k}' for k in sorted(parsed_export.keys()))}. Scroll down to see results.")
         else:
             st.warning("This doesn't look like a full export — use the individual chromosome fields below.")
     else:
