@@ -429,7 +429,9 @@ genome_input = st.text_input(
     value=_prefill,
 )
 
-if genome_input.strip():
+run_color = st.button("🔍 Run color analysis", key="run_color_btn")
+
+if run_color and genome_input.strip():
     positions, error = parse_genome(genome_input.strip(), cr)
 
     if error:
@@ -939,6 +941,8 @@ Paste your CR5 and CR9 genome strings to look up glow, particle location, and ta
 These are lookup tables — results not in the research data will show as **Unknown** or **Glow off**.
 """)
 
+st.button("🔍 Run visual trait analysis", key="run_visual_btn")
+
 col_cr5, col_cr9 = st.columns(2)
 
 with col_cr5:
@@ -948,7 +952,7 @@ with col_cr5:
         placeholder="e.g. RRRR RDxR DR",
         key="cr5_input",
     )
-    if cr5_input.strip():
+    if st.session_state.get("run_visual_btn") and cr5_input.strip():
         result, err = analyze_cr5(cr5_input.strip())
         if err:
             st.error(f"⚠️ {err}")
@@ -1103,7 +1107,7 @@ with col_cr9:
         placeholder="e.g. DDxD DRxR xDRR DRRR RRRR",
         key="cr9_input",
     )
-    if cr9_input.strip():
+    if st.session_state.get("run_visual_btn") and cr9_input.strip():
         result, err = lookup_cr9(cr9_input.strip())
         if err:
             st.error(f"⚠️ {err}")
